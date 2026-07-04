@@ -1,0 +1,111 @@
+<!DOCTYPE html>
+<html lang="ar" dir="rtl">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width,initial-scale=1">
+<title>ProjectHub Pro — Atech</title>
+<link href="https://fonts.googleapis.com/css2?family=IBM+Plex+Sans+Arabic:wght@300;400;500;600;700&display=swap" rel="stylesheet">
+<link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/@tabler/icons-webfont@latest/dist/tabler-icons.min.css">
+<script src="https://cdn.jsdelivr.net/npm/chart.js@4.4.0/dist/chart.umd.min.js"></script>
+<link rel="stylesheet" href="/style.css">
+</head>
+<body>
+<div class="conn-banner" id="conn-banner">&#9888;&#65039; انقطع الاتصال بالخادم</div>
+<div id="login-screen">
+  <div class="lcard">
+    <div class="llogo"><div class="llogo-ic"><i class="ti ti-hexagon-letter-p"></i></div><div><div class="lbrand">ProjectHub Pro<small>Atech Automation Technology</small></div></div></div>
+    <div class="lsub">نظام ادارة المشاريع الهندسية المشترك</div>
+    <div class="lg"><label>اسم المستخدم</label><div class="li-w"><i class="ti ti-user"></i><input type="text" class="li" id="lu" placeholder="username" onkeydown="if(event.key==='Enter')tryLogin()"></div></div>
+    <div class="lg"><label>كلمة المرور</label><div class="li-w"><i class="ti ti-lock"></i><input type="password" class="li" id="lp" placeholder="password" onkeydown="if(event.key==='Enter')tryLogin()"></div></div>
+    <div class="lerr" id="lerr"></div>
+    <button class="lbtn" id="lbtn" onclick="tryLogin()"><i class="ti ti-login"></i>تسجيل الدخول</button>
+    <div class="linfo"><strong>الحساب الافتراضي:</strong><div>&#128081; <span>abdelrahman</span> / admin123</div><div style="font-size:10px;margin-top:6px;color:var(--t3)">اضف باقي الفريق من الاعدادات بعد الدخول</div></div>
+  </div>
+</div>
+<div id="app">
+  <div class="topbar">
+    <div class="tb-logo"><div class="tb-logo-ic"><i class="ti ti-hexagon-letter-p"></i></div><div class="tb-brand">ProjectHub Pro</div></div>
+    <div style="width:1px;height:22px;background:var(--border);margin:0 4px"></div>
+    <span class="tb-pg" id="tb-pg">لوحة التحكم</span>
+    <span class="tb-sub" id="tb-sub">نظرة عامة</span>
+    <div class="sp"></div>
+    <div class="sw"><i class="ti ti-search"></i><input type="text" placeholder="بحث... (/)" id="gsearch" oninput="gSearch(this.value)"></div>
+    <button class="tbtn" id="btn-addtask" onclick="openTM()"><i class="ti ti-plus"></i>مهمة</button>
+    <button class="tbtn" id="btn-addproj" onclick="openPM()"><i class="ti ti-folder-plus"></i>مشروع</button>
+    <button class="tbtn" onclick="doExport()"><i class="ti ti-table-export"></i></button>
+    <button class="tbtn" onclick="window.print()"><i class="ti ti-printer"></i></button>
+    <div style="position:relative"><button class="tbtn" onclick="toggleNotif()"><i class="ti ti-bell"></i></button><span class="ncnt" id="ncnt"></span></div>
+    <div class="ai-badge" onclick="openAI()"><div class="ai-dot"></div><i class="ti ti-robot"></i><span>AI</span></div>
+    <div class="uchip" onclick="logout()"><div class="uav" id="uav"></div><div><div class="uname" id="uname"></div><span class="rbadge" id="urbadge"></span></div></div>
+  </div>
+  <div class="app-body">
+    <aside class="sidebar" id="sb">
+      <nav class="sbnav">
+        <div class="sbgrp"><div class="sbgrp-lbl">الرئيسية</div>
+          <div class="ni active" onclick="goto('dashboard')"><i class="ti ti-dashboard"></i><span class="nlbl">لوحة التحكم</span></div>
+          <div class="ni" onclick="goto('projects')"><i class="ti ti-briefcase"></i><span class="nlbl">المشاريع</span><span class="ncbdg" id="nc-proj">0</span></div>
+        </div>
+        <div class="sbgrp"><div class="sbgrp-lbl">ادارة المهام</div>
+          <div class="ni" onclick="goto('kanban')"><i class="ti ti-layout-kanban"></i><span class="nlbl">Kanban Board</span></div>
+          <div class="ni" onclick="goto('gantt')"><i class="ti ti-chart-gantt"></i><span class="nlbl">Gantt Chart</span></div>
+          <div class="ni" onclick="goto('timeline')"><i class="ti ti-timeline"></i><span class="nlbl">Timeline</span></div>
+        </div>
+        <div class="sbgrp" id="sbg-team"><div class="sbgrp-lbl">الفريق</div>
+          <div class="ni" onclick="goto('team')"><i class="ti ti-users"></i><span class="nlbl">اعضاء الفريق</span></div>
+        </div>
+        <div class="sbgrp"><div class="sbgrp-lbl">التقارير</div>
+          <div class="ni" onclick="goto('sitereport')"><i class="ti ti-report-analytics"></i><span class="nlbl">Site Report</span></div>
+          <div class="ni" onclick="goto('log')"><i class="ti ti-history"></i><span class="nlbl">سجل النشاط</span></div>
+        </div>
+        <div class="sbgrp"><div class="sbgrp-lbl">النظام</div>
+          <div class="ni" id="nav-settings" onclick="goto('settings')"><i class="ti ti-settings"></i><span class="nlbl">الاعدادات</span></div>
+        </div>
+      </nav>
+      <div class="sbfoot"><div class="ni" onclick="toggleSB()"><i class="ti ti-layout-sidebar-right-collapse" id="sb-ic"></i><span class="nlbl">طي القائمة</span></div></div>
+    </aside>
+    <div class="ca">
+      <div class="page active" id="page-dashboard">
+        <div class="kgrid" id="kgrid"><div class="loading"><i class="ti ti-loader-2"></i>جاري التحميل...</div></div>
+        <div class="g12" style="margin-bottom:12px">
+          <div class="panel"><div class="phdr"><div class="ptitle"><i class="ti ti-briefcase"></i>المشاريع</div><button class="pact" onclick="goto('projects')">الكل</button></div><div id="d-proj"></div></div>
+          <div>
+            <div class="panel" style="margin-bottom:12px"><div class="phdr"><div class="ptitle"><i class="ti ti-chart-donut-2"></i>توزيع المهام</div></div><div class="chbox"><canvas id="c-donut"></canvas></div></div>
+            <div class="panel"><div class="phdr"><div class="ptitle"><i class="ti ti-calendar-event"></i>مواعيد قادمة</div></div><div id="d-tl"></div></div>
+          </div>
+        </div>
+        <div class="g3" style="margin-bottom:12px">
+          <div class="panel"><div class="phdr"><div class="ptitle"><i class="ti ti-currency-dollar"></i>الميزانيات</div></div><div id="d-bud"></div></div>
+          <div class="panel"><div class="phdr"><div class="ptitle"><i class="ti ti-chart-bar"></i>تقدم المشاريع</div></div><div class="chbox" style="height:180px"><canvas id="c-bar"></canvas></div></div>
+          <div class="panel"><div class="phdr"><div class="ptitle"><i class="ti ti-heart-rate-monitor"></i>صحة المشاريع</div></div><div id="d-health"></div></div>
+        </div>
+        <div class="g2">
+          <div class="panel"><div class="phdr"><div class="ptitle"><i class="ti ti-chart-line"></i>منحنى التقدم الشهري</div></div><div class="chbox"><canvas id="c-trend"></canvas></div></div>
+          <div class="panel"><div class="phdr"><div class="ptitle"><i class="ti ti-users"></i>الفريق</div></div><div id="d-team"></div></div>
+        </div>
+      </div>
+      <div class="page" id="page-projects"><div class="phd"><div class="phd-l"><div class="phd-t">المشاريع</div><div class="phd-s" id="proj-sub"></div></div><div class="hacts" id="proj-acts"></div></div><div class="g3" id="proj-grid"><div class="loading"><i class="ti ti-loader-2"></i></div></div></div>
+      <div class="page" id="page-kanban"><div class="phd"><div class="phd-l"><div class="phd-t">Kanban Board</div><div class="phd-s" id="kb-sub"></div></div><div class="hacts" id="kb-acts"></div></div><div class="kb-fil"><input type="text" id="kb-q" placeholder="بحث..." oninput="renderKanban()"><select id="kb-pf" onchange="renderKanban()"><option value="">كل المشاريع</option></select><select id="kb-prf" onchange="renderKanban()"><option value="">كل الاولويات</option><option value="high">عالية</option><option value="med">متوسطة</option><option value="low">منخفضة</option></select><select id="kb-af" onchange="renderKanban()"><option value="">كل الاعضاء</option></select></div><div class="kbboard" id="kbboard"><div class="loading"><i class="ti ti-loader-2"></i></div></div></div>
+      <div class="page" id="page-gantt"><div class="phd"><div class="phd-l"><div class="phd-t">Gantt Chart</div><div class="phd-s">الجدول الزمني 2025</div></div><div class="hacts"><select class="fsel" id="g-pf" onchange="renderGantt()"><option value="">كل المشاريع</option></select></div></div><div class="gwrap"><div class="gmhd"><div class="gmsp"></div><div id="g-months" style="display:flex;flex:1"></div></div><table class="gtbl"><thead><tr><th style="width:155px">المشروع</th><th style="width:80px">المسؤول</th><th style="width:80px">الحالة</th><th style="width:45px">%</th><th>الجدول</th></tr></thead><tbody id="g-body"></tbody></table></div></div>
+      <div class="page" id="page-timeline"><div class="phd"><div class="phd-l"><div class="phd-t">Timeline المشاريع</div><div class="phd-s">الخط الزمني والمراحل</div></div><div class="hacts"><select class="fsel" id="tl-pf" onchange="renderTimeline()"><option value="">كل المشاريع</option></select><button class="tbtn pri" onclick="openMsModal()"><i class="ti ti-plus"></i>Milestone</button></div></div><div id="timeline-vis"><div class="loading"><i class="ti ti-loader-2"></i></div></div></div>
+      <div class="page" id="page-team"><div class="phd"><div class="phd-l"><div class="phd-t">الفريق</div><div class="phd-s" id="team-sub"></div></div><div class="hacts" id="team-acts"></div></div><div class="g3" id="team-grid"><div class="loading"><i class="ti ti-loader-2"></i></div></div></div>
+      <div class="page" id="page-sitereport">
+        <div id="sr-phdr" style="display:none;padding:16px 0;border-bottom:2px solid #333;margin-bottom:18px"><div style="display:flex;justify-content:space-between"><div><div style="font-size:20px;font-weight:700;color:#111">Atech Automation Technology</div><div style="font-size:12px;color:#555">Daily Site Performance Report</div></div><div style="text-align:left;font-size:13px;font-weight:600" id="sr-phdr-date"></div></div></div>
+        <div class="phd" id="sr-topbar"><div class="phd-l"><div class="phd-t">Site Report اليومي</div><div class="phd-s" id="sr-date-lbl"></div></div><div class="hacts"><input type="date" class="fsel" id="sr-date" onchange="renderSiteReport()"><select class="fsel" id="sr-pf" onchange="renderSiteReport()"><option value="">كل المشاريع</option></select><button class="tbtn" onclick="saveSiteReport()"><i class="ti ti-device-floppy"></i>حفظ</button><button class="tbtn pri" onclick="printSR()"><i class="ti ti-printer"></i>PDF</button></div></div>
+        <div id="sr-content"><div class="loading"><i class="ti ti-loader-2"></i></div></div>
+      </div>
+      <div class="page" id="page-log"><div class="phd"><div class="phd-l"><div class="phd-t">سجل النشاط</div><div class="phd-s">مسجل على الخادم - مشترك بين الكل</div></div><div class="hacts"><select class="fsel" id="log-f" onchange="renderLog()"><option value="">كل الانشطة</option><option value="task">المهام</option><option value="project">المشاريع</option><option value="user">المستخدمين</option><option value="auth">الدخول</option><option value="reports">التقارير</option></select><button class="tbtn" onclick="renderLog()"><i class="ti ti-refresh"></i></button></div></div><div class="panel"><div id="log-list"><div class="loading"><i class="ti ti-loader-2"></i></div></div></div></div>
+      <div class="page" id="page-settings"><div class="phd"><div class="phd-l"><div class="phd-t">الاعدادات</div><div class="phd-s">اعدادات النظام والمستخدمين</div></div></div><div class="stgrid"><div class="stnav"><div class="stni active" onclick="switchST('company',this)"><i class="ti ti-building"></i>الشركة</div><div class="stni" id="stn-users" onclick="switchST('users',this)"><i class="ti ti-users"></i>المستخدمون</div><div class="stni" onclick="switchST('appearance',this)"><i class="ti ti-palette"></i>المظهر</div><div class="stni" onclick="switchST('roles',this)"><i class="ti ti-shield"></i>الصلاحيات</div></div><div class="stcon"><div class="stsec active" id="ss-company"><div class="sttitle">بيانات الشركة</div><div class="stsub">تظهر في التقارير</div><div class="fg"><label>اسم الشركة</label><input type="text" class="fi" value="Atech Automation Technology"></div><button class="btn-s" onclick="toast('تم الحفظ','ok')">حفظ</button></div><div class="stsec" id="ss-users"><div class="sttitle">المستخدمون</div><div class="stsub">اضافة وحذف حسابات الفريق</div><button class="tbtn pri" style="margin-bottom:14px" onclick="document.getElementById('aum').classList.add('open')"><i class="ti ti-user-plus"></i>اضافة مستخدم</button><table class="stbl" id="users-tbl"></table></div><div class="stsec" id="ss-appearance"><div class="sttitle">المظهر</div><div class="fg" style="margin-top:12px"><label>لون التمييز</label><div id="cswatches" style="display:flex;gap:8px;flex-wrap:wrap;margin-top:6px"></div></div></div><div class="stsec" id="ss-roles"><div class="sttitle">مستويات الصلاحية</div><div id="roles-list"></div></div></div></div></div>
+    </div>
+  </div>
+</div>
+<div class="notifpanel" id="notifpanel"><div style="display:flex;align-items:center;justify-content:space-between;padding:11px 14px;border-bottom:1px solid var(--border)"><div style="font-size:13px;font-weight:700;color:var(--text);display:flex;align-items:center;gap:6px"><i class="ti ti-bell" style="color:var(--amber)"></i>التنبيهات</div><button class="xcbtn" onclick="toggleNotif()"><i class="ti ti-x"></i></button></div><div id="np-list"></div></div>
+<div class="aiov" id="aiov" onclick="if(event.target===this)closeAI()"><div class="aipanel"><div class="aihd"><div class="aititle"><i class="ti ti-sparkles"></i>مساعد AI الذكي</div><button class="xcbtn" onclick="closeAI()"><i class="ti ti-x"></i></button></div><div class="aimsgs" id="ai-msgs"><div class="aimsg bot">مرحبا! اسالني عن مشاريعك.</div></div><div class="aityping" id="ai-typing">يفكر...</div><div class="aichips"><button class="aichip" onclick="askAI('المشاريع المتاخرة؟')">المتاخرة</button><button class="aichip" onclick="askAI('ملخص الميزانية')">الميزانية</button><button class="aichip" onclick="askAI('اولويات الاسبوع')">الاولويات</button><button class="aichip" onclick="askAI('تقرير عام')">تقرير</button><button class="aichip" onclick="askAI('توصيات لتحسين الاداء')">توصيات</button></div><div class="aifoot"><input type="text" class="aiinput" id="ai-q" placeholder="اسال..." onkeydown="if(event.key==='Enter')sendAI()"><button class="aisend" onclick="sendAI()"><i class="ti ti-send"></i></button></div></div></div>
+<div class="mbg" id="tm"><div class="modal wide"><div class="mttl"><span id="tm-lbl">مهمة جديدة</span><button class="xcbtn" onclick="closeTM()"><i class="ti ti-x"></i></button></div><div class="fg"><label>عنوان المهمة</label><input type="text" class="fi" id="ft-title"></div><div class="fr2"><div class="fg"><label>المشروع</label><select class="fs" id="ft-proj"></select></div><div class="fg"><label>المرحلة</label><select class="fs" id="ft-col"><option value="backlog">Backlog</option><option value="todo" selected>قيد التخطيط</option><option value="doing">جارية</option><option value="review">مراجعة</option><option value="done">مكتملة</option></select></div></div><div class="fr2"><div class="fg"><label>الاولوية</label><select class="fs" id="ft-prio"><option value="high">عالية</option><option value="med" selected>متوسطة</option><option value="low">منخفضة</option></select></div><div class="fg"><label>المسؤول</label><select class="fs" id="ft-assign"></select></div></div><div class="fr2"><div class="fg"><label>الموعد</label><input type="date" class="fi" id="ft-date"></div><div class="fg"><label>ساعات</label><input type="number" class="fi" id="ft-hours" min="0"></div></div><div class="fg"><label>ملاحظات</label><textarea class="fta" id="ft-notes"></textarea></div><div class="mfoot"><button class="btn-c" onclick="closeTM()">الغاء</button><button class="btn-s" onclick="saveTask()">حفظ</button></div></div></div>
+<div class="mbg" id="pm"><div class="modal wide"><div class="mttl"><span id="pm-lbl">مشروع جديد</span><button class="xcbtn" onclick="closePM()"><i class="ti ti-x"></i></button></div><div class="fg"><label>الاسم</label><input type="text" class="fi" id="fp-name"></div><div class="fr2"><div class="fg"><label>الميزانية (SAR)</label><input type="number" class="fi" id="fp-bud"></div><div class="fg"><label>المنفق (SAR)</label><input type="number" class="fi" id="fp-spent"></div></div><div class="fr2"><div class="fg"><label>المسؤول</label><select class="fs" id="fp-lead"></select></div><div class="fg"><label>الحالة</label><select class="fs" id="fp-status"><option value="on-track">على المسار</option><option value="at-risk">في خطر</option><option value="delayed">متاخر</option></select></div></div><div class="fr2"><div class="fg"><label>البداية</label><input type="date" class="fi" id="fp-start"></div><div class="fg"><label>الانتهاء</label><input type="date" class="fi" id="fp-end"></div></div><div class="fr2"><div class="fg"><label>الانجاز %</label><input type="number" class="fi" id="fp-pct" min="0" max="100"></div><div class="fg"><label>اللون</label><input type="color" class="fi" id="fp-color" value="#4f8ef7" style="height:40px;padding:4px"></div></div><div class="mfoot"><button class="btn-c" onclick="closePM()">الغاء</button><button class="btn-s" onclick="saveProject()">حفظ</button></div></div></div>
+<div class="mbg" id="mem-m"><div class="modal"><div class="mttl"><span id="mem-lbl">اضافة عضو</span><button class="xcbtn" onclick="closeModal('mem-m')"><i class="ti ti-x"></i></button></div><div class="fg"><label>الاسم</label><input type="text" class="fi" id="fm-name"></div><div class="fg"><label>المسمى الوظيفي</label><input type="text" class="fi" id="fm-role"></div><div class="fg"><label>البريد</label><input type="email" class="fi" id="fm-email"></div><div class="fg"><label>اللون</label><input type="color" class="fi" id="fm-color" value="#4f8ef7" style="height:40px;padding:4px"></div><div class="mfoot"><button class="btn-c" onclick="closeModal('mem-m')">الغاء</button><button class="btn-s" onclick="saveMember()">حفظ</button></div></div></div>
+<div class="mbg" id="ms-m"><div class="modal"><div class="mttl"><span id="ms-lbl">اضافة Milestone</span><button class="xcbtn" onclick="closeModal('ms-m')"><i class="ti ti-x"></i></button></div><div class="fg"><label>العنوان</label><input type="text" class="fi" id="ms-title"></div><div class="fr2"><div class="fg"><label>المشروع</label><select class="fs" id="ms-proj"></select></div><div class="fg"><label>النوع</label><select class="fs" id="ms-type"><option value="milestone">Milestone</option><option value="phase">مرحلة</option><option value="delivery">تسليم</option><option value="review">مراجعة</option></select></div></div><div class="fr2"><div class="fg"><label>البداية</label><input type="date" class="fi" id="ms-start"></div><div class="fg"><label>النهاية</label><input type="date" class="fi" id="ms-end"></div></div><div class="fr2"><div class="fg"><label>الحالة</label><select class="fs" id="ms-status"><option value="upcoming">قادم</option><option value="in-progress">جاري</option><option value="done">مكتمل</option><option value="delayed">متاخر</option></select></div><div class="fg"><label>الانجاز %</label><input type="number" class="fi" id="ms-pct" value="0" min="0" max="100"></div></div><div class="fg"><label>ملاحظات</label><textarea class="fta" id="ms-notes"></textarea></div><div class="mfoot"><button class="btn-c" onclick="closeModal('ms-m')">الغاء</button><button class="btn-s" onclick="saveMilestone()">حفظ</button></div></div></div>
+<div class="mbg" id="aum"><div class="modal"><div class="mttl"><span>اضافة مستخدم</span><button class="xcbtn" onclick="closeModal('aum')"><i class="ti ti-x"></i></button></div><div class="fg"><label>اسم المستخدم</label><input type="text" class="fi" id="au-u"></div><div class="fg"><label>كلمة المرور</label><input type="password" class="fi" id="au-p"></div><div class="fg"><label>الاسم الكامل</label><input type="text" class="fi" id="au-n"></div><div class="fg"><label>الدور</label><select class="fs" id="au-r"><option value="admin">Admin</option><option value="pm">PM</option><option value="lead" selected>Lead</option><option value="engineer">Engineer</option><option value="viewer">Viewer</option></select></div><div class="fg"><label>اللون</label><input type="color" class="fi" id="au-color" value="#22c87a" style="height:40px;padding:4px"></div><div class="mfoot"><button class="btn-c" onclick="closeModal('aum')">الغاء</button><button class="btn-s" onclick="saveNewUser()">اضافة</button></div></div></div>
+<div class="toast" id="toast"><i class="ti ti-check" id="t-ic"></i><span id="t-msg"></span></div>
+<script src="/app.js"></script>
+</body>
+</html>
