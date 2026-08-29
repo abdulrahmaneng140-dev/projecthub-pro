@@ -1,6 +1,7 @@
 const router = require('express').Router();
 const { pool } = require('../db');
 const { authMiddleware, requireRole } = require('../middleware/auth');
+const { triggerWebhooks } = require('./integrations');
 
 const log = async (pool, type, msg, icon, color, userId, userName) =>
   pool.query('INSERT INTO activity_log (type,message,icon,color,user_id,user_name) VALUES ($1,$2,$3,$4,$5,$6)',
@@ -36,6 +37,7 @@ router.post('/', authMiddleware, requireRole('admin', 'pm', 'lead', 'engineer'),
       [title, project_id, priority||'med', col||'todo', assigned_to||'', due_date||null, hours_estimated||0, notes||'', req.user.id]
     );
     await log(pool, 'task', `إضافة مهمة: ${title}`, 'ti-circle-plus', '#22c87a', req.user.id, req.user.name);
+    triggerWebhooks('task.created', rows[0]);
     res.status(201).json(rows[0]);
   } catch (e) { res.status(500).json({ error: e.message }); }
 });
@@ -62,6 +64,7 @@ router.put('/:id', authMiddleware, async (req, res) => {
     );
     if (!rows.length) return res.status(404).json({ error: 'المهمة غير موجودة' });
     await log(pool, 'task', `تعديل مهمة: ${rows[0].title}`, 'ti-edit', '#f0a030', req.user.id, req.user.name);
+    triggerWebhooks('task.updated', rows[0]);
     res.json(rows[0]);
   } catch (e) { res.status(500).json({ error: e.message }); }
 });

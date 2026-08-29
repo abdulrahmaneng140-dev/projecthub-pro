@@ -1,6 +1,7 @@
 const router = require('express').Router();
 const { pool } = require('../db');
 const { authMiddleware, requireRole } = require('../middleware/auth');
+const { triggerWebhooks } = require('./integrations');
 
 const log = async (pool, type, msg, icon, color, userId, userName) => {
   await pool.query(
@@ -55,6 +56,7 @@ router.post('/', authMiddleware, requireRole('admin', 'pm'), async (req, res) =>
 router.put('/:id', authMiddleware, requireRole('admin', 'pm'), async (req, res) => {
   const { name, color, pct, status, budget, spent, lead, start_date, end_date, description } = req.body;
   try {
+    const { rows: before } = await pool.query('SELECT status FROM projects WHERE id=$1', [req.params.id]);
     const { rows } = await pool.query(
       `UPDATE projects SET
         name=COALESCE($1,name), color=COALESCE($2,color), pct=COALESCE($3,pct),
@@ -66,6 +68,8 @@ router.put('/:id', authMiddleware, requireRole('admin', 'pm'), async (req, res) 
     );
     if (!rows.length) return res.status(404).json({ error: 'المشروع غير موجود' });
     await log(pool, 'project', `تعديل مشروع: ${rows[0].name}`, 'ti-edit', '#f0a030', req.user.id, req.user.name);
+    if (before[0] && status && before[0].status !== status) triggerWebhooks('project.status_changed', rows[0]);
+    if (rows[0].budget > 0 && rows[0].spent / rows[0].budget > 1) triggerWebhooks('project.over_budget', rows[0]);
     res.json(rows[0]);
   } catch (e) { res.status(500).json({ error: e.message }); }
 });
