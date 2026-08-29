@@ -126,7 +126,121 @@ async function initDB() {
         created_at TIMESTAMPTZ DEFAULT NOW()
       );
 
+      -- ALERT RULES (KPI alert engine configuration)
+      CREATE TABLE IF NOT EXISTS alert_rules (
+        id SERIAL PRIMARY KEY,
+        name VARCHAR(200) NOT NULL,
+        type VARCHAR(50),
+        condition VARCHAR(50),
+        threshold NUMERIC,
+        enabled BOOLEAN DEFAULT true,
+        notify_email BOOLEAN DEFAULT false,
+        email_to TEXT,
+        created_by INTEGER REFERENCES users(id),
+        created_at TIMESTAMPTZ DEFAULT NOW()
+      );
+
+      -- NOTIFICATIONS (KPI alerts, document alerts, etc.)
+      CREATE TABLE IF NOT EXISTS notifications (
+        id SERIAL PRIMARY KEY,
+        type VARCHAR(30),
+        level VARCHAR(20) DEFAULT 'info',
+        message TEXT,
+        project_id VARCHAR(20),
+        icon VARCHAR(50),
+        color VARCHAR(7),
+        is_read BOOLEAN DEFAULT false,
+        user_id INTEGER REFERENCES users(id),
+        created_at TIMESTAMPTZ DEFAULT NOW()
+      );
+
+      -- INTEGRATIONS: Microsoft Graph account (Outlook/Calendar/OneDrive)
+      CREATE TABLE IF NOT EXISTS ms_graph_accounts (
+        id SERIAL PRIMARY KEY,
+        connected_by INTEGER REFERENCES users(id),
+        account_email VARCHAR(200),
+        access_token TEXT NOT NULL,
+        refresh_token TEXT NOT NULL,
+        expires_at TIMESTAMPTZ NOT NULL,
+        scope TEXT,
+        created_at TIMESTAMPTZ DEFAULT NOW(),
+        updated_at TIMESTAMPTZ DEFAULT NOW()
+      );
+
+      -- INTEGRATIONS: outbound webhooks (for Power Automate / Zapier / etc.)
+      CREATE TABLE IF NOT EXISTS webhook_subscriptions (
+        id SERIAL PRIMARY KEY,
+        name VARCHAR(100) NOT NULL,
+        target_url TEXT NOT NULL,
+        events TEXT[] NOT NULL DEFAULT '{}',
+        enabled BOOLEAN DEFAULT true,
+        secret VARCHAR(64),
+        created_by INTEGER REFERENCES users(id),
+        created_at TIMESTAMPTZ DEFAULT NOW(),
+        last_triggered_at TIMESTAMPTZ,
+        last_status INTEGER
+      );
+
+      -- INTEGRATIONS: API keys for inbound calls (Power Automate HTTP actions)
+      CREATE TABLE IF NOT EXISTS api_keys (
+        id SERIAL PRIMARY KEY,
+        name VARCHAR(100) NOT NULL,
+        key_hash VARCHAR(255) NOT NULL,
+        key_prefix VARCHAR(12) NOT NULL,
+        created_by INTEGER REFERENCES users(id),
+        created_at TIMESTAMPTZ DEFAULT NOW(),
+        last_used_at TIMESTAMPTZ,
+        revoked BOOLEAN DEFAULT false
+      );
+
+      -- DOCUMENT TRACKING — required project documents (GMP protocols, drawings, etc.)
+      CREATE TABLE IF NOT EXISTS project_documents (
+        id SERIAL PRIMARY KEY,
+        project_id VARCHAR(20) REFERENCES projects(id) ON DELETE CASCADE,
+        name VARCHAR(200) NOT NULL,
+        category VARCHAR(50) DEFAULT 'general',
+        status VARCHAR(20) DEFAULT 'missing'
+          CHECK (status IN ('missing','uploaded','under_review','approved')),
+        file_url TEXT,
+        due_date DATE,
+        notes TEXT,
+        uploaded_by INTEGER REFERENCES users(id),
+        uploaded_at TIMESTAMPTZ,
+        created_by INTEGER REFERENCES users(id),
+        created_at TIMESTAMPTZ DEFAULT NOW(),
+        updated_at TIMESTAMPTZ DEFAULT NOW()
+      );
+
+      -- PROJECT DEPENDENCIES — cross-project links (e.g. GPI waiting on a BMS deliverable)
+      CREATE TABLE IF NOT EXISTS project_dependencies (
+        id SERIAL PRIMARY KEY,
+        from_project VARCHAR(20) REFERENCES projects(id) ON DELETE CASCADE,
+        to_project VARCHAR(20) REFERENCES projects(id) ON DELETE CASCADE,
+        type VARCHAR(20) DEFAULT 'blocks'
+          CHECK (type IN ('blocks','depends_on','related')),
+        description TEXT,
+        created_by INTEGER REFERENCES users(id),
+        created_at TIMESTAMPTZ DEFAULT NOW(),
+        UNIQUE(from_project, to_project, type)
+      );
+
+      -- PROJECT TEMPLATES — reusable starting points for new projects
+      CREATE TABLE IF NOT EXISTS project_templates (
+        id SERIAL PRIMARY KEY,
+        name VARCHAR(150) NOT NULL,
+        description TEXT,
+        default_tasks JSONB DEFAULT '[]',
+        default_milestones JSONB DEFAULT '[]',
+        document_template_key VARCHAR(50),
+        created_by INTEGER REFERENCES users(id),
+        created_at TIMESTAMPTZ DEFAULT NOW()
+      );
+
       -- INDEXES
+      CREATE INDEX IF NOT EXISTS idx_documents_project ON project_documents(project_id);
+      CREATE INDEX IF NOT EXISTS idx_documents_status ON project_documents(status);
+      CREATE INDEX IF NOT EXISTS idx_deps_from ON project_dependencies(from_project);
+      CREATE INDEX IF NOT EXISTS idx_deps_to ON project_dependencies(to_project);
       CREATE INDEX IF NOT EXISTS idx_tasks_project ON tasks(project_id);
       CREATE INDEX IF NOT EXISTS idx_tasks_col ON tasks(col);
       CREATE INDEX IF NOT EXISTS idx_milestones_project ON milestones(project_id);
