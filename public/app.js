@@ -56,7 +56,7 @@ const hc=s=>s>=80?'#22c87a':s>=60?'#f0a030':'#f05a5a';
 const hl=s=>s>=80?'ممتاز':s>=60?'متوسط':'ضعيف';
 
 function initSels(){
-  [['ft-proj','proj'],['kb-pf','proj'],['g-pf','proj'],['tl-pf','proj'],['sr-pf','proj'],
+  [['ft-proj','proj'],['kb-pf','proj'],['g-pf','proj'],['tl-pf','proj'],['sr-pf','proj'],['doc-pf','proj'],
    ['fp-lead','team'],['ft-assign','team'],['kb-af','team'],['ms-proj','proj']].forEach(([id,type])=>{
     const s=document.getElementById(id);if(!s)return;
     const v=s.value;
@@ -135,7 +135,7 @@ async function refreshData(){
 setInterval(refreshData,30000);
 
 // ══ NAV ══
-const PT={dashboard:['لوحة التحكم','نظرة عامة'],projects:['المشاريع','إدارة المشاريع'],kanban:['Kanban Board','تتبع المهام'],gantt:['Gantt Chart','الجدول الزمني'],timeline:['Timeline','الخط الزمني'],team:['الفريق','أعضاء الفريق'],sitereport:['Site Report اليومي','تقارير الأداء'],log:['سجل النشاط','مسجل على الخادم'],settings:['الإعدادات','إعدادات النظام']};
+const PT={dashboard:['لوحة التحكم','نظرة عامة'],projects:['المشاريع','إدارة المشاريع'],kanban:['Kanban Board','تتبع المهام'],gantt:['Gantt Chart','الجدول الزمني'],timeline:['Timeline','الخط الزمني'],team:['الفريق','أعضاء الفريق'],sitereport:['Site Report اليومي','تقارير الأداء'],log:['سجل النشاط','مسجل على الخادم'],settings:['الإعدادات','إعدادات النظام'],documents:['تتبع المستندات','المستندات الناقصة والمتأخرة'],portfolio:['Portfolio','إدارة المشاريع المتعددة']};
 async function goto(pg){
   if(pg==='team'&&!can('view_team')){toast('ليس لديك صلاحية','err');return;}
   if(pg==='settings'&&!can('settings')){toast('ليس لديك صلاحية','err');return;}
@@ -155,6 +155,8 @@ async function goto(pg){
   else if(pg==='sitereport')renderSiteReport();
   else if(pg==='log')renderLog();
   else if(pg==='settings')renderSettings();
+  else if(pg==='documents')renderDocuments();
+  else if(pg==='portfolio')renderPortfolio();
 }
 function toggleSB(){sbMini=!sbMini;document.getElementById('sb').classList.toggle('mini',sbMini);document.getElementById('sb-ic').className=sbMini?'ti ti-layout-sidebar-left-expand':'ti ti-layout-sidebar-right-collapse';}
 
@@ -328,7 +330,7 @@ async function renderLog(){
 }
 
 // ══ SETTINGS ══
-function switchST(sec,el){document.querySelectorAll('.stsec').forEach(s=>s.classList.remove('active'));document.querySelectorAll('.stni').forEach(n=>n.classList.remove('active'));document.getElementById('ss-'+sec).classList.add('active');el.classList.add('active');if(sec==='users')renderUsersTable();if(sec==='appearance')renderSwatches();if(sec==='roles')renderRoles();}
+function switchST(sec,el){document.querySelectorAll('.stsec').forEach(s=>s.classList.remove('active'));document.querySelectorAll('.stni').forEach(n=>n.classList.remove('active'));document.getElementById('ss-'+sec).classList.add('active');el.classList.add('active');if(sec==='users')renderUsersTable();if(sec==='appearance')renderSwatches();if(sec==='roles')renderRoles();if(sec==='integrations')renderIntegrations();}
 async function renderSettings(){renderSwatches();renderRoles();if(CU?.role==='admin')renderUsersTable();}
 async function renderUsersTable(){
   try{const users=await API.get('/auth/users');document.getElementById('users-tbl').innerHTML=`<thead><tr><th>المستخدم</th><th>الاسم</th><th>الدور</th><th>آخر دخول</th><th></th></tr></thead><tbody>${users.map(u=>`<tr><td style="font-family:monospace;font-size:12px;color:#4f8ef7">${u.username}</td><td>${u.full_name}</td><td><span class="rbadge rb-${u.role}">${RMETA[u.role]?.l||u.role}</span></td><td style="font-size:11px;color:var(--t3)">${u.last_login?new Date(u.last_login).toLocaleDateString('ar'):'—'}</td><td>${u.id!==CU?.id?`<button class="tcabtn" style="color:var(--red);font-size:11px" onclick="delUser(${u.id})"><i class="ti ti-trash"></i></button>`:''}</td></tr>`).join('')}</tbody>`;}
@@ -396,6 +398,295 @@ function toggleNotif(){const pn=document.getElementById('notifpanel');const open
 // ══ AI ══
 function openAI(){document.getElementById('aiov').classList.add('open');}
 function closeAI(){document.getElementById('aiov').classList.remove('open');}
+async function renderIntegrations(){
+  try{
+    const s=await API.get('/integrations/msgraph/status');
+    const el=document.getElementById('msg-status'),btn=document.getElementById('msg-connect-btn');
+    if(!s.configured){el.textContent='غير مضبوط على السيرفر — أضف MS_CLIENT_ID/MS_CLIENT_SECRET في .env';btn.disabled=true;}
+    else if(s.connected){el.textContent='متصل: '+(s.account?.account_email||'');btn.textContent='إعادة الربط';btn.onclick=connectMicrosoft;}
+    else{el.textContent='غير متصل';btn.disabled=false;}
+  }catch(e){}
+  loadWebhooks();loadApiKeys();
+}
+
+function connectMicrosoft(){window.open(API.base+'/integrations/msgraph/connect?token='+API.token,'_blank');}
+
+async function loadWebhooks(){
+  try{
+    const list=await API.get('/integrations/webhooks');
+    const tbl=document.getElementById('webhooks-tbl');
+    tbl.innerHTML='<tr><th>الاسم</th><th>الأحداث</th><th>الحالة</th><th></th></tr>'+
+      list.map(w=>`<tr><td>${w.name}</td><td style="font-size:11px">${w.events.join(', ')}</td><td>${w.enabled?'مفعّل':'موقوف'}</td>
+        <td><button class="tbtn" onclick="toggleWebhook(${w.id})"><i class="ti ti-power"></i></button>
+        <button class="tbtn" onclick="deleteWebhook(${w.id})"><i class="ti ti-trash"></i></button></td></tr>`).join('')
+      || '<tr><td colspan="4" style="color:#888">لا يوجد webhooks</td></tr>';
+  }catch(e){}
+}
+async function toggleWebhook(id){await API.put('/integrations/webhooks/'+id+'/toggle');loadWebhooks();}
+async function deleteWebhook(id){if(!confirm('حذف الـ webhook؟'))return;await API.del('/integrations/webhooks/'+id);loadWebhooks();}
+function openWebhookModal(){
+  const name=prompt('اسم الـ Webhook (مثال: Power Automate Flow)');if(!name)return;
+  const url=prompt('Target URL (من Power Automate HTTP trigger)');if(!url)return;
+  const evs=prompt('الأحداث مفصولة بفاصلة:\ntask.created, task.updated, project.status_changed, project.over_budget, milestone.delayed');
+  if(!evs)return;
+  API.post('/integrations/webhooks',{name,target_url:url,events:evs.split(',').map(s=>s.trim())})
+    .then(()=>loadWebhooks()).catch(e=>alert(e.message));
+}
+
+async function loadApiKeys(){
+  try{
+    const list=await API.get('/integrations/api-keys');
+    const tbl=document.getElementById('apikeys-tbl');
+    tbl.innerHTML='<tr><th>الاسم</th><th>Prefix</th><th>آخر استخدام</th><th></th></tr>'+
+      list.map(k=>`<tr><td>${k.name}</td><td style="font-family:monospace">${k.key_prefix}...</td><td>${k.last_used_at?new Date(k.last_used_at).toLocaleDateString('ar'):'-'}</td>
+        <td>${k.revoked?'ملغي':`<button class="tbtn" onclick="revokeApiKey(${k.id})"><i class="ti ti-trash"></i></button>`}</td></tr>`).join('')
+      || '<tr><td colspan="4" style="color:#888">لا يوجد مفاتيح</td></tr>';
+  }catch(e){}
+}
+async function createApiKey(){
+  const name=prompt('اسم المفتاح (مثال: Power Automate Inbound)');if(!name)return;
+  try{
+    const r=await API.post('/integrations/api-keys',{name});
+    prompt('انسخ المفتاح الآن — مش هيتعرض تاني:',r.key);
+    loadApiKeys();
+  }catch(e){alert(e.message);}
+}
+async function revokeApiKey(id){if(!confirm('إلغاء المفتاح؟'))return;await API.del('/integrations/api-keys/'+id);loadApiKeys();}
+
+async function exportMSProject(){
+  const proj=document.getElementById('tl-pf')?.value||'';
+  try{
+    const url=API.base+'/msproject/export'+(proj?'?project='+encodeURIComponent(proj):'');
+    const res=await fetch(url,{headers:API.headers()});
+    if(!res.ok){const e=await res.json().catch(()=>({error:'فشل التصدير'}));throw new Error(e.error);}
+    const blob=await res.blob();
+    const a=document.createElement('a');
+    a.href=URL.createObjectURL(blob);a.download=(proj||'all-projects')+'.xml';
+    document.body.appendChild(a);a.click();a.remove();
+  }catch(e){alert(e.message||'فشل تصدير MS Project');}
+}
+
+async function importMSProject(input){
+  const file=input.files[0];if(!file)return;
+  const proj=document.getElementById('tl-pf')?.value;
+  if(!proj){alert('اختر مشروع محدد من القائمة الأول عشان نربط المهام المستوردة بيه');input.value='';return;}
+  const fd=new FormData();fd.append('file',file);fd.append('project_id',proj);
+  try{
+    const res=await fetch(API.base+'/msproject/import',{method:'POST',headers:{'Authorization':'Bearer '+API.token},body:fd});
+    const data=await res.json();
+    if(!res.ok)throw new Error(data.error||'فشل الاستيراد');
+    alert(`تم الاستيراد: ${data.created} مهمة جديدة، ${data.updated} تحديث`);
+    renderTimeline();
+  }catch(e){alert(e.message||'فشل استيراد الملف');}
+  input.value='';
+}
+
+// ══ PORTFOLIO ══
+function switchPF(sec,el){
+  document.querySelectorAll('.pf-tab').forEach(t=>t.classList.remove('active'));
+  document.querySelectorAll('.pfsec').forEach(s=>s.style.display='none');
+  el.classList.add('active');document.getElementById('pf-'+sec).style.display='block';
+  if(sec==='res')loadPFResources();else if(sec==='dep')loadPFDependencies();else if(sec==='tmpl')loadPFTemplates();
+}
+
+async function renderPortfolio(){loadPFDashboard();}
+
+async function loadPFDashboard(){
+  const el=document.getElementById('pf-dash');
+  el.innerHTML='<div class="loading"><i class="ti ti-loader-2"></i></div>';
+  try{
+    const d=await API.get('/portfolio/dashboard');
+    const t=d.totals;
+    el.innerHTML=`
+      <div class="kgrid" style="margin-bottom:16px">
+        <div class="kcard"><div class="kval">${t.projects}</div><div class="klbl">مشروع</div></div>
+        <div class="kcard"><div class="kval">${t.avgProgress}%</div><div class="klbl">متوسط التقدم</div></div>
+        <div class="kcard"><div class="kval" style="color:${t.atRisk?'#f05a5a':'#22c87a'}">${t.atRisk}</div><div class="klbl">مشروع في خطر</div></div>
+        <div class="kcard"><div class="kval">${fmtSAR(t.totalSpent)}</div><div class="klbl">من ${fmtSAR(t.totalBudget)}</div></div>
+        <div class="kcard"><div class="kval" style="color:${t.totalOverdueTasks?'#f0a030':'#22c87a'}">${t.totalOverdueTasks}</div><div class="klbl">مهمة متأخرة</div></div>
+        <div class="kcard"><div class="kval" style="color:${t.totalMissingDocs?'#f05a5a':'#22c87a'}">${t.totalMissingDocs}</div><div class="klbl">مستند ناقص</div></div>
+      </div>
+      <table class="stbl"><tr><th>المشروع</th><th>التقدم</th><th>SPI</th><th>CPI</th><th>ميزانية مستخدمة</th><th>مهام متأخرة</th><th>مستندات ناقصة</th><th>الخطورة</th></tr>
+      ${d.projects.map(p=>`<tr style="${p.riskScore>=3?'background:#f05a5a0d':''}">
+        <td><strong>${p.name}</strong></td>
+        <td>${p.pct}%</td>
+        <td style="color:${p.spi<0.8?'#f05a5a':p.spi<0.95?'#f0a030':'#22c87a'}">${p.spi}</td>
+        <td style="color:${p.cpi<0.8?'#f05a5a':p.cpi<0.95?'#f0a030':'#22c87a'}">${p.cpi}</td>
+        <td>${p.budget?Math.round(p.spent/p.budget*100)+'%':'-'}</td>
+        <td>${p.overdueTasks||'-'}</td>
+        <td>${p.missingDocs||'-'}</td>
+        <td>${p.riskScore>=3?'<span class="pill" style="background:#f05a5a18;color:#f05a5a">عالية</span>':p.riskScore>=1?'<span class="pill" style="background:#f0a03018;color:#f0a030">متوسطة</span>':'<span class="pill" style="background:#22c87a18;color:#22c87a">منخفضة</span>'}</td>
+      </tr>`).join('')}</table>`;
+  }catch(e){el.innerHTML='<div class="empty">فشل تحميل البيانات</div>';}
+}
+function fmtSAR(n){return 'SAR '+Math.round(n||0).toLocaleString('en-US');}
+
+async function loadPFResources(){
+  const el=document.getElementById('pf-res');
+  el.innerHTML='<div class="loading"><i class="ti ti-loader-2"></i></div>';
+  try{
+    const d=await API.get('/portfolio/resources');
+    el.innerHTML=d.team.length?(`<div class="stsub" style="margin-bottom:10px">السعة الافتراضية: ${d.capacityHoursPerWeek} ساعة/أسبوع لكل فرد</div>
+      <table class="stbl"><tr><th>العضو</th><th>عدد المشاريع</th><th>مهام نشطة</th><th>الساعات المقدرة</th><th>نسبة الحمل</th><th>متأخر</th></tr>
+      ${d.team.map(p=>`<tr style="${p.overallocated?'background:#f05a5a0d':''}">
+        <td><strong>${p.name}</strong></td>
+        <td>${p.projectCount}</td>
+        <td>${p.activeTasks}</td>
+        <td>${p.totalHours}h</td>
+        <td style="color:${p.overallocated?'#f05a5a':p.utilizationPct>80?'#f0a030':'#22c87a'}">${p.utilizationPct}%${p.overallocated?' ⚠️ تحميل زائد':''}</td>
+        <td>${p.overdue||'-'}</td>
+      </tr>`).join('')}</table>`)
+      :'<div class="empty">لا توجد مهام مسندة حالياً</div>';
+  }catch(e){el.innerHTML='<div class="empty">فشل تحميل البيانات</div>';}
+}
+
+async function loadPFDependencies(){
+  const el=document.getElementById('pf-dep');
+  el.innerHTML='<div class="loading"><i class="ti ti-loader-2"></i></div>';
+  try{
+    const list=await API.get('/portfolio/dependencies');
+    const DEP_LBL={blocks:'يعطّل',depends_on:'يعتمد على',related:'مرتبط بـ'};
+    el.innerHTML=`<div style="margin-bottom:12px"><button class="tbtn pri" onclick="addDependency()"><i class="ti ti-plus"></i>ربط مشروعين</button></div>`+
+      (list.length?(`<table class="stbl"><tr><th>من</th><th>العلاقة</th><th>إلى</th><th>الوصف</th><th></th></tr>
+      ${list.map(d=>`<tr><td>${d.from_name}</td><td>${DEP_LBL[d.type]||d.type}</td><td>${d.to_name}</td><td>${d.description||'-'}</td>
+        <td><button class="tbtn" onclick="deleteDependency(${d.id})"><i class="ti ti-trash"></i></button></td></tr>`).join('')}</table>`)
+      :'<div class="empty">لا توجد ترابطات بين المشاريع بعد</div>');
+  }catch(e){el.innerHTML='<div class="empty">فشل تحميل البيانات</div>';}
+}
+async function addDependency(){
+  if(!projects.length){toast('لا توجد مشاريع','err');return;}
+  const names=projects.map((p,i)=>`${i+1}) ${p.name} [${p.id}]`).join('\n');
+  const from=prompt('كود المشروع (from) — المشروع اللي عليه التأثير:\n'+names);if(!from)return;
+  const to=prompt('كود المشروع (to) — المشروع التاني:');if(!to)return;
+  const type=prompt('نوع العلاقة: blocks (يعطّل) / depends_on (يعتمد على) / related (مرتبط)','blocks');
+  const description=prompt('وصف مختصر (اختياري):','');
+  try{await API.post('/portfolio/dependencies',{from_project:from.trim(),to_project:to.trim(),type:(type||'blocks').trim(),description});loadPFDependencies();}
+  catch(e){toast(e.message,'err');}
+}
+async function deleteDependency(id){if(!confirm('حذف الربط؟'))return;await API.del('/portfolio/dependencies/'+id);loadPFDependencies();}
+
+async function loadPFTemplates(){
+  const el=document.getElementById('pf-tmpl');
+  el.innerHTML='<div class="loading"><i class="ti ti-loader-2"></i></div>';
+  try{
+    const list=await API.get('/portfolio/templates');
+    el.innerHTML=`<div style="margin-bottom:12px"><button class="tbtn pri" onclick="createTemplate()"><i class="ti ti-plus"></i>قالب مشروع جديد</button></div>`+
+      (list.length?(`<table class="stbl"><tr><th>الاسم</th><th>الوصف</th><th>المهام الافتراضية</th><th>Milestones</th><th></th></tr>
+      ${list.map(t=>`<tr><td><strong>${t.name}</strong></td><td>${t.description||'-'}</td><td>${(t.default_tasks||[]).length}</td><td>${(t.default_milestones||[]).length}</td>
+        <td><button class="tbtn" onclick="applyProjectTemplate(${t.id})">تطبيق على مشروع</button>
+        <button class="tbtn" onclick="deleteTemplate(${t.id})"><i class="ti ti-trash"></i></button></td></tr>`).join('')}</table>`)
+      :'<div class="empty">لا توجد قوالب مشاريع بعد — أنشئ واحد لتسريع بدء المشاريع الجديدة</div>');
+  }catch(e){el.innerHTML='<div class="empty">فشل تحميل البيانات</div>';}
+}
+async function createTemplate(){
+  const name=prompt('اسم القالب (مثال: مشروع GMP قياسي):');if(!name)return;
+  const description=prompt('وصف مختصر:','');
+  const tasksRaw=prompt('المهام الافتراضية، كل مهمة في سطر:\n(مثال:\nIQ Protocol\nOQ Protocol\nPQ Protocol)');
+  const default_tasks=(tasksRaw||'').split('\n').map(s=>s.trim()).filter(Boolean).map(title=>({title}));
+  const msRaw=prompt('الـ Milestones الافتراضية، كل واحدة في سطر (اختياري):');
+  const default_milestones=(msRaw||'').split('\n').map(s=>s.trim()).filter(Boolean).map(title=>({title}));
+  const document_template_key=prompt('قالب المستندات المرتبط (اختياري): gmp_validation / bms_handover / general','');
+  try{await API.post('/portfolio/templates',{name,description,default_tasks,default_milestones,document_template_key:document_template_key||null});loadPFTemplates();}
+  catch(e){toast(e.message,'err');}
+}
+async function deleteTemplate(id){if(!confirm('حذف القالب؟'))return;await API.del('/portfolio/templates/'+id);loadPFTemplates();}
+async function applyProjectTemplate(id){
+  if(!projects.length){toast('لا توجد مشاريع','err');return;}
+  const names=projects.map((p,i)=>`${i+1}) ${p.name} [${p.id}]`).join('\n');
+  const proj=prompt('كود المشروع اللي هتطبّق عليه القالب:\n'+names);if(!proj)return;
+  try{
+    const r=await API.post('/portfolio/templates/'+id+'/apply',{project_id:proj.trim()});
+    toast(`تم: ${r.tasksAdded} مهمة، ${r.msAdded} milestone، ${r.docsAdded} مستند`,'ok');
+  }catch(e){toast(e.message,'err');}
+}
+
+// ══ DOCUMENT TRACKING ══
+const DOC_STATUS={missing:{l:'ناقص',c:'#f05a5a'},uploaded:{l:'مرفوع',c:'#f0a030'},under_review:{l:'مراجعة',c:'#9b72f4'},approved:{l:'معتمد',c:'#22c87a'}};
+
+async function renderDocuments(){
+  initSels();
+  const proj=document.getElementById('doc-pf')?.value||'';
+  const summaryEl=document.getElementById('doc-summary'),contentEl=document.getElementById('documents-content');
+  contentEl.innerHTML='<div class="loading"><i class="ti ti-loader-2"></i></div>';
+  try{
+    if(!proj){
+      // No project selected: show cross-project missing summary
+      const missing=await API.get('/documents/summary/missing');
+      summaryEl.innerHTML=`<div class="kcard" style="max-width:260px"><div class="kval" style="color:#f05a5a">${missing.length}</div><div class="klbl">مستند ناقص عبر كل المشاريع</div></div>`;
+      contentEl.innerHTML=missing.length?('<table class="stbl"><tr><th>المستند</th><th>المشروع</th><th>الفئة</th><th>موعد الاستحقاق</th></tr>'+
+        missing.map(d=>`<tr><td>${d.name}</td><td>${d.project_name}</td><td>${d.category}</td><td>${d.due_date||'-'}</td></tr>`).join('')+'</table>')
+        :'<div class="empty">اختر مشروع من القائمة، أو لا يوجد مستندات ناقصة حالياً 🎉</div>';
+      return;
+    }
+    const docs=await API.get('/documents/'+proj);
+    const byStatus={missing:0,uploaded:0,under_review:0,approved:0};
+    docs.forEach(d=>byStatus[d.status]=(byStatus[d.status]||0)+1);
+    summaryEl.innerHTML=Object.entries(DOC_STATUS).map(([k,v])=>
+      `<span class="pill" style="background:${v.c}18;color:${v.c};border:1px solid ${v.c}33;margin-left:6px">${v.l}: ${byStatus[k]||0}</span>`
+    ).join('');
+    contentEl.innerHTML=docs.length?('<table class="stbl"><tr><th>المستند</th><th>الفئة</th><th>الحالة</th><th>موعد الاستحقاق</th><th>ملف</th><th></th></tr>'+
+      docs.map(d=>`<tr>
+        <td>${d.name}</td><td>${d.category}</td>
+        <td><select class="fsel" style="font-size:11px" onchange="updateDocStatus(${d.id},this.value)">
+          ${Object.entries(DOC_STATUS).map(([k,v])=>`<option value="${k}" ${d.status===k?'selected':''}>${v.l}</option>`).join('')}
+        </select></td>
+        <td>${d.due_date||'-'}</td>
+        <td>${d.file_url?`<a href="${d.file_url}" target="_blank"><i class="ti ti-external-link"></i></a>`:`<button class="tbtn" style="font-size:11px" onclick="attachDocLink(${d.id})">إرفاق رابط</button>`}</td>
+        <td><button class="tbtn" onclick="deleteDocRequirement(${d.id})"><i class="ti ti-trash"></i></button></td>
+      </tr>`).join('')+'</table>')
+      :'<div class="empty">لا توجد مستندات مطلوبة لهذا المشروع بعد — طبّق قالب أو أضف مستند جديد</div>';
+  }catch(e){contentEl.innerHTML='<div class="empty">فشل تحميل البيانات</div>';}
+}
+
+async function updateDocStatus(id,status){
+  try{await API.put('/documents/item/'+id,{status});toast('تم التحديث','ok');}catch(e){toast(e.message,'err');}
+}
+async function attachDocLink(id){
+  const url=prompt('رابط الملف (مثال: رابط OneDrive أو أي مكان تخزين):');if(!url)return;
+  try{await API.put('/documents/item/'+id,{file_url:url,status:'uploaded'});renderDocuments();}catch(e){toast(e.message,'err');}
+}
+async function deleteDocRequirement(id){
+  if(!confirm('حذف هذا المستند من القائمة؟'))return;
+  try{await API.del('/documents/item/'+id);renderDocuments();}catch(e){toast(e.message,'err');}
+}
+async function addDocRequirement(){
+  const proj=document.getElementById('doc-pf')?.value;
+  if(!proj){toast('اختر مشروع أولاً','err');return;}
+  const name=prompt('اسم المستند المطلوب:');if(!name)return;
+  const category=prompt('الفئة (مثال: validation, planning, handover):','general');
+  try{await API.post('/documents/'+proj,{name,category});renderDocuments();}catch(e){toast(e.message,'err');}
+}
+async function applyDocTemplate(){
+  const proj=document.getElementById('doc-pf')?.value;
+  if(!proj){toast('اختر مشروع أولاً','err');return;}
+  const choice=prompt('اختر قالب:\n1) gmp_validation — تحقق GMP/صيدلاني\n2) bms_handover — تسليم BMS/EMS\n3) general — عام\n\nاكتب: gmp_validation او bms_handover او general');
+  if(!choice)return;
+  try{
+    const r=await API.post('/documents/'+proj+'/apply-template',{template:choice.trim()});
+    toast(`تم إضافة ${r.added} مستند`,'ok');renderDocuments();
+  }catch(e){toast(e.message,'err');}
+}
+async function runDocCheck(){
+  try{
+    const r=await API.post('/documents/check/run');
+    toast(`تم الفحص: ${r.added} تنبيه جديد من ${r.checked} مستند ناقص`,'ok');
+  }catch(e){toast(e.message,'err');}
+}
+
+async function downloadReport(format){
+  const type=document.getElementById('rep-type').value;
+  try{
+    const res=await fetch(API.base+'/reports/'+type+'/'+format,{headers:API.headers()});
+    if(!res.ok){const e=await res.json().catch(()=>({error:'فشل التصدير'}));throw new Error(e.error);}
+    const blob=await res.blob();
+    const url=URL.createObjectURL(blob);
+    const a=document.createElement('a');
+    a.href=url;a.download=type+'-report.'+(format==='xlsx'?'xlsx':'pdf');
+    document.body.appendChild(a);a.click();a.remove();
+    URL.revokeObjectURL(url);
+  }catch(e){alert(e.message||'فشل تحميل التقرير');}
+}
+
 async function askAI(q){document.getElementById('ai-q').value=q;await sendAI();}
 async function sendAI(){
   const inp=document.getElementById('ai-q'),q=inp.value.trim();if(!q)return;
@@ -432,3 +723,365 @@ function toast(msg,type='ok'){const el=document.getElementById('toast'),ic=docum
 
 // ══ INIT ══
 autoLogin();
+
+// ══════════════════════════════════════════════════════════════
+// KPI CENTER
+// ══════════════════════════════════════════════════════════════
+let kpiData = null;
+let kpiCharts = {};
+let kpiRefreshTimer = null;
+
+async function loadKPI() {
+  try {
+    kpiData = await API.get('/kpi/overview');
+    renderKPIPage();
+  } catch(e) { toast('خطأ في تحميل KPI: ' + e.message, 'err'); }
+}
+
+function renderKPIPage() {
+  if (!kpiData) return;
+  const el = document.getElementById('kpi-center-content');
+  if (!el) return;
+
+  const { projects: P, tasks: T, team: TM, financial: F, alerts: A, trend, milestones: MS } = kpiData;
+
+  // Destroy old charts
+  Object.values(kpiCharts).forEach(c => { try { c.destroy(); } catch(e){} });
+  kpiCharts = {};
+
+  el.innerHTML = `
+  <!-- ALERT BANNER -->
+  ${A.filter(a=>a.level==='critical').length ? `
+  <div style="background:rgba(240,90,90,.1);border:1px solid rgba(240,90,90,.3);border-radius:var(--r);padding:12px 16px;margin-bottom:14px;display:flex;align-items:center;gap:10px">
+    <i class="ti ti-alert-triangle" style="color:#f05a5a;font-size:20px;flex-shrink:0"></i>
+    <div style="flex:1"><div style="font-size:13px;font-weight:600;color:#f05a5a">يوجد ${A.filter(a=>a.level==='critical').length} تنبيه حرج يحتاج تدخل فوري</div>
+    <div style="font-size:11px;color:var(--t3);margin-top:2px">${A.filter(a=>a.level==='critical').map(a=>a.msg).slice(0,2).join(' • ')}</div></div>
+    <button class="tbtn" onclick="goto('kpi-alerts')" style="flex-shrink:0;font-size:11px">عرض الكل</button>
+  </div>` : ''}
+
+  <!-- TOP KPI ROW -->
+  <div style="display:grid;grid-template-columns:repeat(6,1fr);gap:10px;margin-bottom:14px">
+    ${[
+      {ic:'ti-briefcase',bg:'rgba(79,142,247,.08)',c:'#4f8ef7',v:P.onTrack+'/'+P.total,l:'على المسار / الكل'},
+      {ic:'ti-chart-line',bg:'rgba(34,200,122,.08)',c:'#22c87a',v:P.avgProgress+'%',l:'متوسط الإنجاز'},
+      {ic:'ti-circle-check',bg:'rgba(34,200,122,.08)',c:'#22c87a',v:T.completionRate+'%',l:'معدل إتمام المهام'},
+      {ic:'ti-clock',bg:'rgba(240,90,90,.08)',c:'#f05a5a',v:T.overdue,l:'مهام متأخرة'},
+      {ic:'ti-currency-dollar',bg:'rgba(240,160,48,.08)',c:'#f0a030',v:F.budgetUtilization+'%',l:'استخدام الميزانية'},
+      {ic:'ti-trending-up',bg:'rgba(155,114,244,.08)',c:'#9b72f4',v:F.roi+'%',l:'مؤشر ROI'},
+    ].map(k=>`<div class="kcard" style="padding:12px"><div class="kglow" style="background:${k.c}"></div>
+      <div class="kicon" style="background:${k.bg};margin-bottom:8px"><i class="ti ${k.ic}" style="color:${k.c}"></i></div>
+      <div class="kval" style="font-size:20px">${k.v}</div><div class="klbl">${k.l}</div></div>`).join('')}
+  </div>
+
+  <!-- ROW 2: SPI Table + Task Distribution -->
+  <div class="g2" style="margin-bottom:12px">
+    <div class="panel">
+      <div class="phdr"><div class="ptitle"><i class="ti ti-chart-arrows-vertical"></i>مؤشرات الأداء (SPI / CPI)</div>
+        <div style="font-size:10px;color:var(--t3)">SPI=تقدم/مخطط · CPI=قيمة/تكلفة · أفضل من 1</div>
+      </div>
+      <table style="width:100%;border-collapse:collapse">
+        <thead><tr>
+          <th style="font-size:10px;color:var(--t3);padding:7px 12px;border-bottom:1px solid var(--border);text-align:right">المشروع</th>
+          <th style="font-size:10px;color:var(--t3);padding:7px 12px;border-bottom:1px solid var(--border);text-align:right">الإنجاز</th>
+          <th style="font-size:10px;color:var(--t3);padding:7px 12px;border-bottom:1px solid var(--border);text-align:right">المخطط</th>
+          <th style="font-size:10px;color:var(--t3);padding:7px 12px;border-bottom:1px solid var(--border);text-align:right">SPI</th>
+          <th style="font-size:10px;color:var(--t3);padding:7px 12px;border-bottom:1px solid var(--border);text-align:right">CPI</th>
+        </tr></thead>
+        <tbody>
+          ${P.spi.map(p=>{
+            const sc=p.spi>=1?'#22c87a':p.spi>=0.8?'#f0a030':'#f05a5a';
+            const cc=p.cpi>=1?'#22c87a':p.cpi>=0.8?'#f0a030':'#f05a5a';
+            return `<tr style="border-bottom:1px solid var(--border)">
+              <td style="padding:8px 12px"><div style="display:flex;align-items:center;gap:7px"><div style="width:8px;height:8px;border-radius:50%;background:${p.color};flex-shrink:0"></div><div style="font-size:12px;color:var(--text)">${p.name}</div></div></td>
+              <td style="padding:8px 12px;font-size:12px;color:var(--text)">${p.pct||0}%</td>
+              <td style="padding:8px 12px;font-size:12px;color:var(--t3)">${p.planned||0}%</td>
+              <td style="padding:8px 12px;font-size:12px;font-weight:700;color:${sc}">${p.spi}</td>
+              <td style="padding:8px 12px;font-size:12px;font-weight:700;color:${cc}">${p.cpi}</td>
+            </tr>`;
+          }).join('')}
+        </tbody>
+      </table>
+    </div>
+    <div class="panel">
+      <div class="phdr"><div class="ptitle"><i class="ti ti-chart-donut-2"></i>توزيع المهام بالتفصيل</div></div>
+      <div class="chbox" style="height:210px"><canvas id="kpi-task-donut"></canvas></div>
+      <div style="display:grid;grid-template-columns:repeat(5,1fr);gap:4px;padding:0 14px 12px;text-align:center">
+        ${[['backlog','#5c657e','Backlog'],['todo','#4f8ef7','مخطط'],['doing','#f0a030','جارية'],['review','#9b72f4','مراجعة'],['done','#22c87a','مكتمل']].map(([k,c,l])=>`<div><div style="font-size:16px;font-weight:700;color:${c}">${T.byCol[k]||0}</div><div style="font-size:10px;color:var(--t3)">${l}</div></div>`).join('')}
+      </div>
+    </div>
+  </div>
+
+  <!-- ROW 3: Progress Trend + Financial -->
+  <div class="g2" style="margin-bottom:12px">
+    <div class="panel">
+      <div class="phdr"><div class="ptitle"><i class="ti ti-chart-line"></i>منحنى التقدم الأسبوعي</div></div>
+      <div class="chbox" style="height:220px"><canvas id="kpi-trend-line"></canvas></div>
+    </div>
+    <div class="panel">
+      <div class="phdr"><div class="ptitle"><i class="ti ti-currency-dollar"></i>الأداء المالي</div></div>
+      <div style="padding:12px">
+        <div style="display:grid;grid-template-columns:1fr 1fr;gap:10px;margin-bottom:12px">
+          ${[
+            {l:'إجمالي الميزانية',v:'SAR '+fmtK(F.totalBudget),c:'var(--text)'},
+            {l:'إجمالي المنفق',v:'SAR '+fmtK(F.totalSpent),c:F.budgetUtilization>90?'#f05a5a':F.budgetUtilization>70?'#f0a030':'#22c87a'},
+            {l:'الانحراف المتبقي',v:'SAR '+fmtK(Math.abs(F.budgetVariance)),c:F.budgetVariance>=0?'#22c87a':'#f05a5a'},
+            {l:'القيمة المكتسبة',v:'SAR '+fmtK(F.earnedValue),c:'#9b72f4'},
+          ].map(x=>`<div style="background:var(--bg3);border-radius:8px;padding:10px"><div style="font-size:10px;color:var(--t3);margin-bottom:3px">${x.l}</div><div style="font-size:14px;font-weight:700;color:${x.c}">${x.v}</div></div>`).join('')}
+        </div>
+        <div class="chbox" style="height:160px;padding:0"><canvas id="kpi-fin-bar"></canvas></div>
+      </div>
+    </div>
+  </div>
+
+  <!-- ROW 4: Team Performance -->
+  <div class="panel" style="margin-bottom:12px">
+    <div class="phdr"><div class="ptitle"><i class="ti ti-users"></i>أداء الفريق</div>
+      <div style="font-size:11px;color:var(--t3)">Score = (مهام مكتملة / إجمالي) × 100 - (متأخرة × 10)</div>
+    </div>
+    <div style="padding:14px;display:grid;grid-template-columns:repeat(auto-fill,minmax(200px,1fr));gap:10px">
+      ${TM.map(m=>{
+        const sc=m.score>=70?'#22c87a':m.score>=40?'#f0a030':'#f05a5a';
+        return `<div style="background:var(--bg3);border-radius:var(--r);padding:12px;text-align:center">
+          <div style="width:44px;height:44px;border-radius:50%;background:${m.color}22;color:${m.color};display:flex;align-items:center;justify-content:center;font-size:18px;font-weight:700;margin:0 auto 8px">${m.name[0]}</div>
+          <div style="font-size:13px;font-weight:600;color:var(--text);margin-bottom:2px">${m.name}</div>
+          <div style="font-size:10px;color:var(--t3);margin-bottom:8px">${m.role||''}</div>
+          <div style="font-size:22px;font-weight:700;color:${sc};margin-bottom:6px">${m.score}</div>
+          <div style="height:4px;background:var(--bg4);border-radius:2px;overflow:hidden;margin-bottom:8px"><div style="height:100%;background:${sc};width:${m.score}%;border-radius:2px"></div></div>
+          <div style="display:grid;grid-template-columns:1fr 1fr 1fr;gap:4px;font-size:10px;color:var(--t3)">
+            <div><div style="font-weight:700;color:var(--text)">${m.total}</div>إجمالي</div>
+            <div><div style="font-weight:700;color:#22c87a">${m.done}</div>مكتمل</div>
+            <div><div style="font-weight:700;color:${m.overdue>0?'#f05a5a':'var(--t3)'}">${m.overdue}</div>متأخر</div>
+          </div>
+        </div>`;
+      }).join('')}
+    </div>
+  </div>
+
+  <!-- ROW 5: Milestones summary + Alerts list -->
+  <div class="g2" style="margin-bottom:12px">
+    <div class="panel">
+      <div class="phdr"><div class="ptitle"><i class="ti ti-flag-3"></i>ملخص Milestones</div></div>
+      <div style="display:grid;grid-template-columns:repeat(4,1fr);gap:0;text-align:center;padding:16px">
+        ${[['الكل',MS.total,'#4f8ef7'],['مكتملة',MS.done,'#22c87a'],['قادمة',MS.upcoming,'#9b72f4'],['متأخرة',MS.delayed,'#f05a5a']].map(([l,v,c])=>`<div style="padding:10px;border-left:1px solid var(--border)"><div style="font-size:28px;font-weight:700;color:${c}">${v}</div><div style="font-size:12px;color:var(--t3);margin-top:3px">${l}</div></div>`).join('')}
+      </div>
+    </div>
+    <div class="panel">
+      <div class="phdr"><div class="ptitle"><i class="ti ti-bell"></i>التنبيهات النشطة</div><span style="font-size:11px;color:var(--t3)">${A.length} تنبيه</span></div>
+      <div style="max-height:160px;overflow-y:auto">
+        ${A.slice(0,6).map(a=>`<div style="display:flex;align-items:center;gap:10px;padding:8px 14px;border-bottom:1px solid var(--border)">
+          <div style="width:28px;height:28px;border-radius:50%;background:${a.color}18;display:flex;align-items:center;justify-content:center;flex-shrink:0"><i class="ti ${a.icon}" style="color:${a.color};font-size:13px"></i></div>
+          <div style="font-size:12px;color:var(--text);flex:1">${a.msg}</div>
+          <span class="pill" style="font-size:9px;background:${a.color}18;color:${a.color};border:1px solid ${a.color}33">${a.level==='critical'?'حرج':'تحذير'}</span>
+        </div>`).join('')}
+        ${A.length===0?'<div class="empty" style="padding:20px">✅ لا توجد تنبيهات</div>':''}
+      </div>
+    </div>
+  </div>`;
+
+  // Render charts
+  setTimeout(() => {
+    // Task Donut
+    const ctx1 = document.getElementById('kpi-task-donut')?.getContext('2d');
+    if(ctx1) kpiCharts.donut = new Chart(ctx1, {type:'doughnut',data:{labels:['Backlog','قيد التخطيط','جارية','مراجعة','مكتملة'],datasets:[{data:[T.byCol.backlog,T.byCol.todo,T.byCol.doing,T.byCol.review,T.byCol.done],backgroundColor:['#3a4060','#4f8ef7','#f0a030','#9b72f4','#22c87a'],borderWidth:0,hoverOffset:5}]},options:{responsive:true,maintainAspectRatio:false,cutout:'65%',plugins:{legend:{display:false}}}});
+
+    // Trend Line
+    const ctx2 = document.getElementById('kpi-trend-line')?.getContext('2d');
+    if(ctx2 && trend) kpiCharts.trend = new Chart(ctx2, {type:'line',data:{labels:trend.weeks,datasets:trend.progress.map(p=>({label:p.name,data:p.data,borderColor:p.color,backgroundColor:p.color+'15',borderWidth:2,fill:true,tension:.4,pointRadius:3}))},options:{responsive:true,maintainAspectRatio:false,plugins:{legend:{position:'bottom',labels:{color:'#9aa3bc',font:{size:10},padding:8,boxWidth:10}}},scales:{y:{max:100,grid:{color:'#2e344860'},ticks:{color:'#5c657e',font:{size:10},callback:v=>v+'%'}},x:{grid:{color:'#2e344830'},ticks:{color:'#5c657e',font:{size:10}}}}}});
+
+    // Financial Bar
+    const ctx3 = document.getElementById('kpi-fin-bar')?.getContext('2d');
+    if(ctx3) kpiCharts.fin = new Chart(ctx3, {type:'bar',data:{labels:F.byProject.map(p=>p.id),datasets:[{label:'الميزانية',data:F.byProject.map(p=>p.budget),backgroundColor:'#4f8ef755',borderRadius:4},{label:'المنفق',data:F.byProject.map(p=>p.spent),backgroundColor:F.byProject.map(p=>p.utilization>90?'#f05a5a':p.utilization>70?'#f0a030':'#22c87a'),borderRadius:4}]},options:{responsive:true,maintainAspectRatio:false,plugins:{legend:{position:'bottom',labels:{color:'#9aa3bc',font:{size:10},padding:6,boxWidth:10}}},scales:{x:{grid:{display:false},ticks:{color:'#5c657e',font:{size:10}}},y:{grid:{color:'#2e344860'},ticks:{color:'#5c657e',font:{size:10},callback:v=>fmtK(v)}}}}});
+  }, 100);
+}
+
+function fmtK(n) { return n>=1e6?(n/1e6).toFixed(1)+'M':n>=1e3?(n/1e3).toFixed(0)+'K':n; }
+
+// ══ ALERT RULES PAGE ══
+async function renderAlertRules() {
+  const el = document.getElementById('kpi-rules-content');
+  if (!el) return;
+  try {
+    const [rules, schedStatus] = await Promise.all([
+      API.get('/kpi/rules'),
+      API.get('/kpi/schedule-status'),
+    ]);
+    el.innerHTML = `
+    <div class="g2" style="margin-bottom:14px">
+      <div class="panel">
+        <div class="phdr"><div class="ptitle"><i class="ti ti-mail"></i>إرسال تقرير فوري</div></div>
+        <div style="padding:14px">
+          <div class="fg"><label>البريد الإلكتروني</label><input type="email" class="fi" id="email-to-input" placeholder="manager@atech.sa"></div>
+          <div class="fg"><label>الموضوع</label><input type="text" class="fi" id="email-subject" value="تقرير الأداء — ProjectHub Pro"></div>
+          <button class="btn-s" onclick="sendEmailReport()"><i class="ti ti-send" style="margin-left:5px"></i>إرسال التقرير الآن</button>
+        </div>
+      </div>
+      <div class="panel">
+        <div class="phdr"><div class="ptitle"><i class="ti ti-calendar-repeat"></i>التقرير الأسبوعي التلقائي</div></div>
+        <div style="padding:14px">
+          <div style="display:flex;align-items:center;gap:8px;margin-bottom:10px">
+            <div style="width:10px;height:10px;border-radius:50%;background:${schedStatus.emailConfigured?'#22c87a':'#f05a5a'}"></div>
+            <span style="font-size:13px;color:var(--text)">${schedStatus.emailConfigured?'البريد مضبوط ✅':'البريد غير مضبوط ❌'}</span>
+          </div>
+          ${schedStatus.weeklyReportTo?`<div style="font-size:12px;color:var(--t3);margin-bottom:8px">يُرسل إلى: <strong style="color:var(--accent)">${schedStatus.weeklyReportTo}</strong></div>`:''}
+          <div style="font-size:11px;color:var(--t3);background:var(--bg3);padding:10px;border-radius:var(--r);line-height:1.7">
+            أضف في الـ <code style="color:var(--accent)">.env</code> على الخادم:<br>
+            <code>EMAIL_USER=your@gmail.com</code><br>
+            <code>EMAIL_PASS=app_password</code><br>
+            <code>WEEKLY_REPORT_EMAIL=manager@atech.sa</code><br>
+            <span style="font-size:10px">للـ Gmail: فعّل 2FA ثم أنشئ App Password</span>
+          </div>
+        </div>
+      </div>
+    </div>
+
+    <div class="panel">
+      <div class="phdr"><div class="ptitle"><i class="ti ti-bell-ringing"></i>قواعد التنبيهات</div>
+        <button class="tbtn pri" onclick="openRuleModal()"><i class="ti ti-plus"></i>قاعدة جديدة</button>
+      </div>
+      <table style="width:100%;border-collapse:collapse">
+        <thead><tr>
+          <th style="font-size:11px;color:var(--t3);padding:9px 14px;border-bottom:1px solid var(--border);text-align:right">القاعدة</th>
+          <th style="font-size:11px;color:var(--t3);padding:9px 14px;border-bottom:1px solid var(--border);text-align:right">النوع</th>
+          <th style="font-size:11px;color:var(--t3);padding:9px 14px;border-bottom:1px solid var(--border);text-align:right">الحد</th>
+          <th style="font-size:11px;color:var(--t3);padding:9px 14px;border-bottom:1px solid var(--border);text-align:right">مفعّل</th>
+          <th style="font-size:11px;color:var(--t3);padding:9px 14px;border-bottom:1px solid var(--border);text-align:right">إيميل</th>
+          <th style="font-size:11px;color:var(--t3);padding:9px 14px;border-bottom:1px solid var(--border)"></th>
+        </tr></thead>
+        <tbody>
+          ${rules.map(r=>`<tr style="border-bottom:1px solid var(--border)">
+            <td style="padding:9px 14px;font-size:13px;color:var(--text)">${r.name}</td>
+            <td style="padding:9px 14px"><span class="pill p-info" style="font-size:10px">${r.type}</span></td>
+            <td style="padding:9px 14px;font-size:12px;color:var(--t3)">${r.threshold||'—'}</td>
+            <td style="padding:9px 14px"><span style="font-size:12px;color:${r.enabled?'#22c87a':'#5c657e'}">${r.enabled?'✅ نعم':'❌ لا'}</span></td>
+            <td style="padding:9px 14px"><span style="font-size:12px;color:${r.notify_email?'#4f8ef7':'#5c657e'}">${r.notify_email?'✉️ نعم':'لا'}</span></td>
+            <td style="padding:9px 14px;display:flex;gap:6px">
+              <button class="tcabtn" onclick="toggleRule(${r.id},${!r.enabled})" style="font-size:11px"><i class="ti ti-${r.enabled?'toggle-right':'toggle-left'}"></i></button>
+              <button class="tcabtn" style="color:var(--red);font-size:11px" onclick="deleteRule(${r.id})"><i class="ti ti-trash"></i></button>
+            </td>
+          </tr>`).join('')}
+        </tbody>
+      </table>
+      <div style="padding:12px 14px;border-top:1px solid var(--border)">
+        <button class="tbtn" onclick="runAlertCheck()"><i class="ti ti-refresh"></i>تشغيل فحص التنبيهات الآن</button>
+      </div>
+    </div>`;
+  } catch(e) { el.innerHTML = '<div class="empty">خطأ في التحميل</div>'; }
+}
+
+async function sendEmailReport() {
+  const to = document.getElementById('email-to-input')?.value?.trim();
+  const subject = document.getElementById('email-subject')?.value?.trim();
+  if (!to) { toast('أدخل البريد الإلكتروني', 'err'); return; }
+  try {
+    const data = await API.post('/kpi/send-report', { to, subject });
+    toast(data.message || 'تم الإرسال', 'ok');
+  } catch(e) { toast(e.message, 'err'); }
+}
+
+async function toggleRule(id, enabled) {
+  try { await API.put('/kpi/rules/'+id, { enabled }); renderAlertRules(); toast('تم التحديث', 'ok'); }
+  catch(e) { toast(e.message, 'err'); }
+}
+async function deleteRule(id) {
+  if (!confirm('حذف هذه القاعدة؟')) return;
+  try { await API.del('/kpi/rules/'+id); renderAlertRules(); toast('تم الحذف', 'ok'); }
+  catch(e) { toast(e.message, 'err'); }
+}
+async function runAlertCheck() {
+  try { const d = await API.post('/kpi/check-alerts', {}); toast(`تم الفحص — أضيف ${d.added} تنبيه جديد`, 'info'); }
+  catch(e) { toast(e.message, 'err'); }
+}
+
+// ══ NOTIFICATIONS PANEL ══
+let notifData = [];
+async function loadNotifications() {
+  try {
+    notifData = await API.get('/kpi/notifications');
+    renderNotifPanel();
+    updateNBadge();
+  } catch(e) {}
+}
+
+function renderNotifPanel() {
+  const el = document.getElementById('np-list');
+  if (!el) return;
+  const unread = notifData.filter(n => !n.is_read);
+  if (!notifData.length) { el.innerHTML = '<div class="empty">✅ لا توجد تنبيهات</div>'; return; }
+  el.innerHTML = `
+    ${unread.length ? `<div style="padding:8px 14px;display:flex;align-items:center;justify-content:space-between;border-bottom:1px solid var(--border)"><span style="font-size:12px;color:var(--t3)">${unread.length} غير مقروء</span><button class="pact" onclick="markAllRead()">تحديد الكل كمقروء</button></div>` : ''}
+    ${notifData.slice(0,10).map(n=>`
+    <div class="npitem" style="opacity:${n.is_read?0.5:1};cursor:pointer" onclick="markRead(${n.id},this)">
+      <div class="npic" style="background:${n.color||'#4f8ef7'}18"><i class="ti ${n.icon||'ti-bell'}" style="color:${n.color||'#4f8ef7'}"></i></div>
+      <div style="flex:1"><div class="nptxt">${n.message}</div>
+      <div class="npsub">${new Date(n.created_at).toLocaleDateString('ar')} ${new Date(n.created_at).toLocaleTimeString('ar',{hour:'2-digit',minute:'2-digit'})}</div></div>
+      ${!n.is_read?'<div style="width:7px;height:7px;border-radius:50%;background:#4f8ef7;flex-shrink:0;margin-top:5px"></div>':''}
+    </div>`).join('')}`;
+}
+
+async function markRead(id, el) {
+  try { await API.put('/kpi/notifications/'+id+'/read', {}); el.style.opacity='0.5'; updateNBadge(); }
+  catch(e) {}
+}
+async function markAllRead() {
+  try { await API.put('/kpi/notifications/read-all', {}); loadNotifications(); }
+  catch(e) {}
+}
+
+// Override updateNBadge to use server notifications
+const _origUpdateNBadge = updateNBadge;
+updateNBadge = function() {
+  const unread = notifData.filter(n => !n.is_read).length;
+  const localN = buildNotifs().length;
+  const total = Math.max(unread, localN);
+  const b = document.getElementById('ncnt');
+  if (b) { b.textContent = total; b.style.display = total ? 'flex' : 'none'; }
+};
+
+// Override toggleNotif to load server notifications
+const _origToggleNotif = toggleNotif;
+toggleNotif = function() {
+  const pn = document.getElementById('notifpanel');
+  const open = pn.classList.toggle('open');
+  if (open) { loadNotifications(); }
+};
+
+// ══ AUTO REFRESH KPI ══
+function startKPIRefresh() {
+  if (kpiRefreshTimer) clearInterval(kpiRefreshTimer);
+  kpiRefreshTimer = setInterval(() => {
+    if (curPage === 'kpi-overview') loadKPI();
+  }, 30000);
+}
+
+// ══ PATCH GOTO FOR KPI PAGES ══
+const _origGotoForKPI = goto;
+goto = async function(pg) {
+  if (pg === 'kpi-overview') {
+    document.querySelectorAll('.page').forEach(p => p.classList.remove('active'));
+    document.querySelectorAll('.ni').forEach(n => n.classList.remove('active'));
+    document.getElementById('page-kpi-overview')?.classList.add('active');
+    document.querySelector(".ni[onclick*=\"'kpi-overview'\"]")?.classList.add('active');
+    document.getElementById('tb-pg').textContent = 'KPI Center';
+    document.getElementById('tb-sub').textContent = 'مؤشرات الأداء الرئيسية';
+    curPage = pg;
+    await loadKPI();
+    startKPIRefresh();
+    return;
+  }
+  if (pg === 'kpi-alerts') {
+    document.querySelectorAll('.page').forEach(p => p.classList.remove('active'));
+    document.querySelectorAll('.ni').forEach(n => n.classList.remove('active'));
+    document.getElementById('page-kpi-alerts')?.classList.add('active');
+    document.querySelector(".ni[onclick*=\"'kpi-alerts'\"]")?.classList.add('active');
+    document.getElementById('tb-pg').textContent = 'التنبيهات والإيميل';
+    document.getElementById('tb-sub').textContent = 'قواعد التنبيه وإرسال التقارير';
+    curPage = pg;
+    await renderAlertRules();
+    return;
+  }
+  _origGotoForKPI(pg);
+};
+
+// Load notifications on startup
+setTimeout(() => { if (CU) loadNotifications(); }, 2000);
+setInterval(() => { if (CU) loadNotifications(); }, 60000);

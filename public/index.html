@@ -53,7 +53,15 @@
         <div class="sbgrp" id="sbg-team"><div class="sbgrp-lbl">الفريق</div>
           <div class="ni" onclick="goto('team')"><i class="ti ti-users"></i><span class="nlbl">اعضاء الفريق</span></div>
         </div>
+        <div class="sbgrp"><div class="sbgrp-lbl">KPI والمتابعة</div>
+          <div class="ni" onclick="goto('portfolio')"><i class="ti ti-layout-grid"></i><span class="nlbl">Portfolio</span></div>
+          <div class="ni" onclick="goto('kpi-overview')"><i class="ti ti-chart-arrows-vertical"></i><span class="nlbl">KPI Center</span></div>
+          <div class="ni" onclick="goto('kpi-alerts')"><i class="ti ti-bell-ringing"></i><span class="nlbl">التنبيهات والإيميل</span></div>
+          <div class="ni" onclick="goto('documents')"><i class="ti ti-file-check"></i><span class="nlbl">المستندات</span></div>
+        </div>
         <div class="sbgrp"><div class="sbgrp-lbl">التقارير</div>
+          <div class="ni" onclick="goto('kpi-overview')"><i class="ti ti-chart-arrows-vertical"></i><span class="nlbl">KPI Center</span></div>
+          <div class="ni" onclick="goto('kpi-alerts')"><i class="ti ti-bell-ringing"></i><span class="nlbl">التنبيهات والإيميل</span></div>
           <div class="ni" onclick="goto('sitereport')"><i class="ti ti-report-analytics"></i><span class="nlbl">Site Report</span></div>
           <div class="ni" onclick="goto('log')"><i class="ti ti-history"></i><span class="nlbl">سجل النشاط</span></div>
         </div>
@@ -86,15 +94,58 @@
       <div class="page" id="page-projects"><div class="phd"><div class="phd-l"><div class="phd-t">المشاريع</div><div class="phd-s" id="proj-sub"></div></div><div class="hacts" id="proj-acts"></div></div><div class="g3" id="proj-grid"><div class="loading"><i class="ti ti-loader-2"></i></div></div></div>
       <div class="page" id="page-kanban"><div class="phd"><div class="phd-l"><div class="phd-t">Kanban Board</div><div class="phd-s" id="kb-sub"></div></div><div class="hacts" id="kb-acts"></div></div><div class="kb-fil"><input type="text" id="kb-q" placeholder="بحث..." oninput="renderKanban()"><select id="kb-pf" onchange="renderKanban()"><option value="">كل المشاريع</option></select><select id="kb-prf" onchange="renderKanban()"><option value="">كل الاولويات</option><option value="high">عالية</option><option value="med">متوسطة</option><option value="low">منخفضة</option></select><select id="kb-af" onchange="renderKanban()"><option value="">كل الاعضاء</option></select></div><div class="kbboard" id="kbboard"><div class="loading"><i class="ti ti-loader-2"></i></div></div></div>
       <div class="page" id="page-gantt"><div class="phd"><div class="phd-l"><div class="phd-t">Gantt Chart</div><div class="phd-s">الجدول الزمني 2025</div></div><div class="hacts"><select class="fsel" id="g-pf" onchange="renderGantt()"><option value="">كل المشاريع</option></select></div></div><div class="gwrap"><div class="gmhd"><div class="gmsp"></div><div id="g-months" style="display:flex;flex:1"></div></div><table class="gtbl"><thead><tr><th style="width:155px">المشروع</th><th style="width:80px">المسؤول</th><th style="width:80px">الحالة</th><th style="width:45px">%</th><th>الجدول</th></tr></thead><tbody id="g-body"></tbody></table></div></div>
-      <div class="page" id="page-timeline"><div class="phd"><div class="phd-l"><div class="phd-t">Timeline المشاريع</div><div class="phd-s">الخط الزمني والمراحل</div></div><div class="hacts"><select class="fsel" id="tl-pf" onchange="renderTimeline()"><option value="">كل المشاريع</option></select><button class="tbtn pri" onclick="openMsModal()"><i class="ti ti-plus"></i>Milestone</button></div></div><div id="timeline-vis"><div class="loading"><i class="ti ti-loader-2"></i></div></div></div>
+      <div class="page" id="page-timeline"><div class="phd"><div class="phd-l"><div class="phd-t">Timeline المشاريع</div><div class="phd-s">الخط الزمني والمراحل</div></div><div class="hacts"><select class="fsel" id="tl-pf" onchange="renderTimeline()"><option value="">كل المشاريع</option></select><button class="tbtn" onclick="exportMSProject()"><i class="ti ti-file-export"></i>MS Project</button><label class="tbtn" style="cursor:pointer"><i class="ti ti-file-import"></i>استيراد XML<input type="file" accept=".xml" id="msp-import-file" style="display:none" onchange="importMSProject(this)"></label><button class="tbtn pri" onclick="openMsModal()"><i class="ti ti-plus"></i>Milestone</button></div></div><div id="timeline-vis"><div class="loading"><i class="ti ti-loader-2"></i></div></div></div>
       <div class="page" id="page-team"><div class="phd"><div class="phd-l"><div class="phd-t">الفريق</div><div class="phd-s" id="team-sub"></div></div><div class="hacts" id="team-acts"></div></div><div class="g3" id="team-grid"><div class="loading"><i class="ti ti-loader-2"></i></div></div></div>
       <div class="page" id="page-sitereport">
         <div id="sr-phdr" style="display:none;padding:16px 0;border-bottom:2px solid #333;margin-bottom:18px"><div style="display:flex;justify-content:space-between"><div><div style="font-size:20px;font-weight:700;color:#111">Atech Automation Technology</div><div style="font-size:12px;color:#555">Daily Site Performance Report</div></div><div style="text-align:left;font-size:13px;font-weight:600" id="sr-phdr-date"></div></div></div>
         <div class="phd" id="sr-topbar"><div class="phd-l"><div class="phd-t">Site Report اليومي</div><div class="phd-s" id="sr-date-lbl"></div></div><div class="hacts"><input type="date" class="fsel" id="sr-date" onchange="renderSiteReport()"><select class="fsel" id="sr-pf" onchange="renderSiteReport()"><option value="">كل المشاريع</option></select><button class="tbtn" onclick="saveSiteReport()"><i class="ti ti-device-floppy"></i>حفظ</button><button class="tbtn pri" onclick="printSR()"><i class="ti ti-printer"></i>PDF</button></div></div>
         <div id="sr-content"><div class="loading"><i class="ti ti-loader-2"></i></div></div>
       </div>
+      <div class="page" id="page-kpi-overview">
+        <div class="phd"><div class="phd-l"><div class="phd-t">KPI Center</div><div class="phd-s">مؤشرات الاداء الرئيسية - تحديث تلقائي كل 30 ثانية</div></div><div class="hacts"><select class="fsel" id="rep-type"><option value="progress">تقرير التقدم</option><option value="financial">تقرير مالي</option><option value="risk">تقرير المخاطر</option></select><button class="tbtn" onclick="downloadReport('pdf')"><i class="ti ti-file-type-pdf"></i>PDF</button><button class="tbtn" onclick="downloadReport('xlsx')"><i class="ti ti-file-type-xls"></i>Excel</button><button class="tbtn" onclick="loadKPI()"><i class="ti ti-refresh"></i>تحديث</button><button class="tbtn pri" onclick="goto('kpi-alerts')"><i class="ti ti-bell-ringing"></i>التنبيهات</button></div></div>
+        <div id="kpi-center-content"><div class="loading"><i class="ti ti-loader-2"></i>جاري تحليل البيانات...</div></div>
+      </div>
+      <div class="page" id="page-kpi-alerts">
+        <div class="phd"><div class="phd-l"><div class="phd-t">التنبيهات والايميل</div><div class="phd-s">قواعد التنبيه التلقائي وارسال التقارير</div></div><div class="hacts"><button class="tbtn" onclick="runAlertCheck()"><i class="ti ti-player-play"></i>تشغيل الفحص</button><button class="tbtn" onclick="renderAlertRules()"><i class="ti ti-refresh"></i>تحديث</button></div></div>
+        <div id="kpi-rules-content"><div class="loading"><i class="ti ti-loader-2"></i>جاري التحميل...</div></div>
+      </div>
+      <div class="page" id="page-portfolio">
+        <div class="phd"><div class="phd-l"><div class="phd-t">Portfolio</div><div class="phd-s">إدارة المشاريع المتعددة</div></div><div class="hacts"><button class="tbtn" onclick="renderPortfolio()"><i class="ti ti-refresh"></i>تحديث</button></div></div>
+        <div class="ptabs" style="display:flex;gap:8px;margin-bottom:14px">
+          <button class="tbtn pf-tab active" onclick="switchPF('dash',this)">مقارنة المشاريع</button>
+          <button class="tbtn pf-tab" onclick="switchPF('res',this)">حمل الفريق</button>
+          <button class="tbtn pf-tab" onclick="switchPF('dep',this)">الترابطات</button>
+          <button class="tbtn pf-tab" onclick="switchPF('tmpl',this)">القوالب</button>
+        </div>
+        <div id="pf-dash" class="pfsec"><div class="loading"><i class="ti ti-loader-2"></i></div></div>
+        <div id="pf-res" class="pfsec" style="display:none"></div>
+        <div id="pf-dep" class="pfsec" style="display:none"></div>
+        <div id="pf-tmpl" class="pfsec" style="display:none"></div>
+      </div>
+      <div class="page" id="page-documents">
+        <div class="phd"><div class="phd-l"><div class="phd-t">تتبع المستندات</div><div class="phd-s">المستندات الناقصة والمتأخرة لكل مشروع</div></div><div class="hacts"><select class="fsel" id="doc-pf" onchange="renderDocuments()"><option value="">اختر مشروع</option></select><button class="tbtn" onclick="applyDocTemplate()"><i class="ti ti-clipboard-list"></i>تطبيق قالب</button><button class="tbtn" onclick="addDocRequirement()"><i class="ti ti-plus"></i>مستند جديد</button><button class="tbtn pri" onclick="runDocCheck()"><i class="ti ti-bell-ringing"></i>فحص وتنبيه</button></div></div>
+        <div id="doc-summary" style="margin-bottom:14px"></div>
+        <div id="documents-content"><div class="loading"><i class="ti ti-loader-2"></i></div></div>
+      </div>
       <div class="page" id="page-log"><div class="phd"><div class="phd-l"><div class="phd-t">سجل النشاط</div><div class="phd-s">مسجل على الخادم - مشترك بين الكل</div></div><div class="hacts"><select class="fsel" id="log-f" onchange="renderLog()"><option value="">كل الانشطة</option><option value="task">المهام</option><option value="project">المشاريع</option><option value="user">المستخدمين</option><option value="auth">الدخول</option><option value="reports">التقارير</option></select><button class="tbtn" onclick="renderLog()"><i class="ti ti-refresh"></i></button></div></div><div class="panel"><div id="log-list"><div class="loading"><i class="ti ti-loader-2"></i></div></div></div></div>
-      <div class="page" id="page-settings"><div class="phd"><div class="phd-l"><div class="phd-t">الاعدادات</div><div class="phd-s">اعدادات النظام والمستخدمين</div></div></div><div class="stgrid"><div class="stnav"><div class="stni active" onclick="switchST('company',this)"><i class="ti ti-building"></i>الشركة</div><div class="stni" id="stn-users" onclick="switchST('users',this)"><i class="ti ti-users"></i>المستخدمون</div><div class="stni" onclick="switchST('appearance',this)"><i class="ti ti-palette"></i>المظهر</div><div class="stni" onclick="switchST('roles',this)"><i class="ti ti-shield"></i>الصلاحيات</div></div><div class="stcon"><div class="stsec active" id="ss-company"><div class="sttitle">بيانات الشركة</div><div class="stsub">تظهر في التقارير</div><div class="fg"><label>اسم الشركة</label><input type="text" class="fi" value="Atech Automation Technology"></div><button class="btn-s" onclick="toast('تم الحفظ','ok')">حفظ</button></div><div class="stsec" id="ss-users"><div class="sttitle">المستخدمون</div><div class="stsub">اضافة وحذف حسابات الفريق</div><button class="tbtn pri" style="margin-bottom:14px" onclick="document.getElementById('aum').classList.add('open')"><i class="ti ti-user-plus"></i>اضافة مستخدم</button><table class="stbl" id="users-tbl"></table></div><div class="stsec" id="ss-appearance"><div class="sttitle">المظهر</div><div class="fg" style="margin-top:12px"><label>لون التمييز</label><div id="cswatches" style="display:flex;gap:8px;flex-wrap:wrap;margin-top:6px"></div></div></div><div class="stsec" id="ss-roles"><div class="sttitle">مستويات الصلاحية</div><div id="roles-list"></div></div></div></div></div>
+      <div class="page" id="page-settings"><div class="phd"><div class="phd-l"><div class="phd-t">الاعدادات</div><div class="phd-s">اعدادات النظام والمستخدمين</div></div></div><div class="stgrid"><div class="stnav"><div class="stni active" onclick="switchST('company',this)"><i class="ti ti-building"></i>الشركة</div><div class="stni" id="stn-users" onclick="switchST('users',this)"><i class="ti ti-users"></i>المستخدمون</div><div class="stni" onclick="switchST('appearance',this)"><i class="ti ti-palette"></i>المظهر</div><div class="stni" onclick="switchST('roles',this)"><i class="ti ti-shield"></i>الصلاحيات</div><div class="stni" onclick="switchST('integrations',this)"><i class="ti ti-plug"></i>التكاملات</div></div><div class="stcon"><div class="stsec active" id="ss-company"><div class="sttitle">بيانات الشركة</div><div class="stsub">تظهر في التقارير</div><div class="fg"><label>اسم الشركة</label><input type="text" class="fi" value="Atech Automation Technology"></div><button class="btn-s" onclick="toast('تم الحفظ','ok')">حفظ</button></div><div class="stsec" id="ss-users"><div class="sttitle">المستخدمون</div><div class="stsub">اضافة وحذف حسابات الفريق</div><button class="tbtn pri" style="margin-bottom:14px" onclick="document.getElementById('aum').classList.add('open')"><i class="ti ti-user-plus"></i>اضافة مستخدم</button><table class="stbl" id="users-tbl"></table></div><div class="stsec" id="ss-appearance"><div class="sttitle">المظهر</div><div class="fg" style="margin-top:12px"><label>لون التمييز</label><div id="cswatches" style="display:flex;gap:8px;flex-wrap:wrap;margin-top:6px"></div></div></div><div class="stsec" id="ss-roles"><div class="sttitle">مستويات الصلاحية</div><div id="roles-list"></div></div><div class="stsec" id="ss-integrations">
+  <div class="sttitle">التكاملات</div><div class="stsub">Microsoft 365، Power Automate، وأدوات خارجية</div>
+  <div style="margin-top:16px;padding:16px;border:1px solid #2a2a2a;border-radius:10px">
+    <div style="display:flex;align-items:center;justify-content:space-between"><div><strong>حساب Microsoft (Outlook / Calendar / OneDrive)</strong><div id="msg-status" style="font-size:12px;color:#888;margin-top:4px">جاري الفحص...</div></div><button class="tbtn pri" id="msg-connect-btn" onclick="connectMicrosoft()"><i class="ti ti-brand-windows"></i>ربط الحساب</button></div>
+  </div>
+  <div style="margin-top:16px;padding:16px;border:1px solid #2a2a2a;border-radius:10px">
+    <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:10px"><strong>Webhooks (Power Automate)</strong><button class="tbtn" onclick="openWebhookModal()"><i class="ti ti-plus"></i>اضافة</button></div>
+    <table class="stbl" id="webhooks-tbl"></table>
+  </div>
+  <div style="margin-top:16px;padding:16px;border:1px solid #2a2a2a;border-radius:10px">
+    <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:10px"><strong>API Keys (لاستدعاءات Power Automate الداخلة)</strong><button class="tbtn" onclick="createApiKey()"><i class="ti ti-key"></i>مفتاح جديد</button></div>
+    <table class="stbl" id="apikeys-tbl"></table>
+  </div>
+  <div style="margin-top:16px;padding:16px;border:1px solid #2a2a2a;border-radius:10px">
+    <strong>MS Project</strong>
+    <div class="stsub">تصدير/استيراد ملفات XML متاح من صفحة Timeline لكل مشروع</div>
+  </div>
+</div></div></div></div>
     </div>
   </div>
 </div>
