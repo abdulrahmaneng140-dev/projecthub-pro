@@ -236,7 +236,44 @@ async function initDB() {
         created_at TIMESTAMPTZ DEFAULT NOW()
       );
 
+      -- COMMISSIONING MATRIX — detailed panel/loop checklist across
+      -- Communication/Programming/Commissioning/Validation/Handover stages
+      CREATE TABLE IF NOT EXISTS commissioning_items (
+        id SERIAL PRIMARY KEY,
+        project_id VARCHAR(20) REFERENCES projects(id) ON DELETE CASCADE,
+        item_no INTEGER,
+        panel_name VARCHAR(200) NOT NULL,
+        serving_equipment VARCHAR(200),
+        stages JSONB DEFAULT '{}',
+        notes TEXT,
+        created_by INTEGER REFERENCES users(id),
+        created_at TIMESTAMPTZ DEFAULT NOW(),
+        updated_at TIMESTAMPTZ DEFAULT NOW()
+      );
+
+      -- ISSUES LOG — site/commissioning issues tracking
+      CREATE TABLE IF NOT EXISTS project_issues (
+        id SERIAL PRIMARY KEY,
+        project_id VARCHAR(20) REFERENCES projects(id) ON DELETE CASCADE,
+        sn INTEGER,
+        phase VARCHAR(100),
+        system_name VARCHAR(150),
+        issue TEXT NOT NULL,
+        reasons TEXT,
+        responsible VARCHAR(150),
+        corrective_action TEXT,
+        status VARCHAR(50) DEFAULT 'Open',
+        open_date DATE,
+        closed_date DATE,
+        remark TEXT,
+        created_by INTEGER REFERENCES users(id),
+        created_at TIMESTAMPTZ DEFAULT NOW(),
+        updated_at TIMESTAMPTZ DEFAULT NOW()
+      );
+
       -- INDEXES
+      CREATE INDEX IF NOT EXISTS idx_issues_project ON project_issues(project_id);
+      CREATE INDEX IF NOT EXISTS idx_commissioning_project ON commissioning_items(project_id);
       CREATE INDEX IF NOT EXISTS idx_documents_project ON project_documents(project_id);
       CREATE INDEX IF NOT EXISTS idx_documents_status ON project_documents(status);
       CREATE INDEX IF NOT EXISTS idx_deps_from ON project_dependencies(from_project);

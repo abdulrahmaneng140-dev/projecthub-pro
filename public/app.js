@@ -56,7 +56,7 @@ const hc=s=>s>=80?'#22c87a':s>=60?'#f0a030':'#f05a5a';
 const hl=s=>s>=80?'ممتاز':s>=60?'متوسط':'ضعيف';
 
 function initSels(){
-  [['ft-proj','proj'],['kb-pf','proj'],['g-pf','proj'],['tl-pf','proj'],['sr-pf','proj'],['doc-pf','proj'],
+  [['ft-proj','proj'],['kb-pf','proj'],['g-pf','proj'],['tl-pf','proj'],['sr-pf','proj'],['doc-pf','proj'],['cm-pf','proj'],['is-pf','proj'],
    ['fp-lead','team'],['ft-assign','team'],['kb-af','team'],['ms-proj','proj']].forEach(([id,type])=>{
     const s=document.getElementById(id);if(!s)return;
     const v=s.value;
@@ -135,7 +135,7 @@ async function refreshData(){
 setInterval(refreshData,30000);
 
 // ══ NAV ══
-const PT={dashboard:['لوحة التحكم','نظرة عامة'],projects:['المشاريع','إدارة المشاريع'],kanban:['Kanban Board','تتبع المهام'],gantt:['Gantt Chart','الجدول الزمني'],timeline:['Timeline','الخط الزمني'],team:['الفريق','أعضاء الفريق'],sitereport:['Site Report اليومي','تقارير الأداء'],log:['سجل النشاط','مسجل على الخادم'],settings:['الإعدادات','إعدادات النظام'],documents:['تتبع المستندات','المستندات الناقصة والمتأخرة'],portfolio:['Portfolio','إدارة المشاريع المتعددة']};
+const PT={dashboard:['لوحة التحكم','نظرة عامة'],projects:['المشاريع','إدارة المشاريع'],kanban:['Kanban Board','تتبع المهام'],gantt:['Gantt Chart','الجدول الزمني'],timeline:['Timeline','الخط الزمني'],team:['الفريق','أعضاء الفريق'],sitereport:['Site Report اليومي','تقارير الأداء'],log:['سجل النشاط','مسجل على الخادم'],settings:['الإعدادات','إعدادات النظام'],documents:['تتبع المستندات','المستندات الناقصة والمتأخرة'],portfolio:['Portfolio','إدارة المشاريع المتعددة'],commissioning:['مصفوفة الإنجاز','تدقيق تفصيلي لكل لوحة عبر مراحل الإنجاز'],issues:['Issues Log','تتبع مشاكل الموقع والتشغيل']};
 async function goto(pg){
   if(pg==='team'&&!can('view_team')){toast('ليس لديك صلاحية','err');return;}
   if(pg==='settings'&&!can('settings')){toast('ليس لديك صلاحية','err');return;}
@@ -157,6 +157,8 @@ async function goto(pg){
   else if(pg==='settings')renderSettings();
   else if(pg==='documents')renderDocuments();
   else if(pg==='portfolio')renderPortfolio();
+  else if(pg==='commissioning')renderCommissioning();
+  else if(pg==='issues')renderIssues();
 }
 function toggleSB(){sbMini=!sbMini;document.getElementById('sb').classList.toggle('mini',sbMini);document.getElementById('sb-ic').className=sbMini?'ti ti-layout-sidebar-left-expand':'ti ti-layout-sidebar-right-collapse';}
 
@@ -671,6 +673,162 @@ async function runDocCheck(){
     const r=await API.post('/documents/check/run');
     toast(`تم الفحص: ${r.added} تنبيه جديد من ${r.checked} مستند ناقص`,'ok');
   }catch(e){toast(e.message,'err');}
+}
+
+// ══ COMMISSIONING MATRIX ══
+let cmStageTemplate=null;
+const CM_STATUS={done:{l:'✓',c:'#22c87a',next:'na'},na:{l:'-',c:'#5c657e',next:'pending'},pending:{l:'',c:'#f0a030',next:'done'}};
+const CM_CATEGORY_COLOR={Communication:'#4f8ef7',Programming:'#9b72f4',Commissioning:'#f0a030',Validation:'#22c87a',Handover:'#f472b6'};
+
+async function renderCommissioning(){
+  initSels();
+  const proj=document.getElementById('cm-pf')?.value;
+  const summaryEl=document.getElementById('cm-summary'),contentEl=document.getElementById('commissioning-content');
+  if(!proj){contentEl.innerHTML='<div class="empty">اختر مشروع من القائمة عشان تشوف مصفوفة الإنجاز</div>';summaryEl.innerHTML='';return;}
+  contentEl.innerHTML='<div class="loading"><i class="ti ti-loader-2"></i></div>';
+  try{
+    if(!cmStageTemplate){const t=await API.get('/commissioning/template');cmStageTemplate=t.stages;}
+    const items=await API.get('/commissioning/'+proj);
+    const avgPct=items.length?Math.round(items.reduce((a,i)=>a+i.pct,0)/items.length):0;
+    summaryEl.innerHTML=`<div class="kcard" style="max-width:220px"><div class="kval" style="color:${avgPct>=80?'#22c87a':avgPct>=40?'#f0a030':'#f05a5a'}">${avgPct}%</div><div class="klbl">متوسط الإنجاز — ${items.length} لوحة/حلقة</div></div>`;
+
+    if(!items.length){contentEl.innerHTML='<div class="empty">لا توجد لوحات/حلقات لهذا المشروع بعد — استوردي ملف Excel أو أضيفي لوحة يدوياً</div>';return;}
+
+    // Build grouped 2-row header
+    const cats=[];cmStageTemplate.forEach(s=>{if(!cats.length||cats[cats.length-1].name!==s.category)cats.push({name:s.category,count:1});else cats[cats.length-1].count++;});
+    const catRow=cats.map(c=>`<th colspan="${c.count}" style="background:${CM_CATEGORY_COLOR[c.name]}18;color:${CM_CATEGORY_COLOR[c.name]};text-align:center;font-size:10px;padding:6px 2px">${c.name}</th>`).join('');
+    const stageRow=cmStageTemplate.map(s=>`<th style="font-size:9px;padding:6px 3px;writing-mode:vertical-rl;text-orientation:mixed;max-height:90px;white-space:nowrap">${s.label}</th>`).join('');
+
+    contentEl.innerHTML=`<table class="stbl" style="min-width:1200px"><thead>
+      <tr><th rowspan="2">اللوحة</th><th rowspan="2">تخدم</th><th rowspan="2">%</th>${catRow}</tr>
+      <tr>${stageRow}</tr>
+    </thead><tbody>
+    ${items.map(it=>`<tr>
+      <td style="white-space:nowrap"><strong>${it.panel_name}</strong></td>
+      <td style="font-size:11px;color:var(--t3)">${it.serving_equipment||'-'}</td>
+      <td style="font-weight:700;color:${it.pct>=80?'#22c87a':it.pct>=40?'#f0a030':'#f05a5a'}">${it.pct}%</td>
+      ${cmStageTemplate.map(s=>{
+        const st=it.stages?.[s.key]||'pending';const m=CM_STATUS[st];
+        return `<td style="text-align:center;cursor:pointer;background:${m.c}12" title="${s.label}: ${st}" onclick="cycleCommissioningStage(${it.id},'${s.key}','${st}')"><span style="color:${m.c};font-weight:700">${m.l}</span></td>`;
+      }).join('')}
+      <td><button class="tbtn" style="font-size:10px" onclick="deleteCommissioningItem(${it.id})"><i class="ti ti-trash"></i></button></td>
+    </tr>`).join('')}
+    </tbody></table>`;
+  }catch(e){contentEl.innerHTML='<div class="empty">فشل تحميل البيانات</div>';}
+}
+
+async function cycleCommissioningStage(id,stageKey,curStatus){
+  const next=CM_STATUS[curStatus].next;
+  try{await API.put('/commissioning/item/'+id,{stage_key:stageKey,stage_status:next});renderCommissioning();}
+  catch(e){toast(e.message,'err');}
+}
+async function deleteCommissioningItem(id){
+  if(!confirm('حذف هذه اللوحة/الحلقة من المصفوفة؟'))return;
+  try{await API.del('/commissioning/item/'+id);renderCommissioning();}catch(e){toast(e.message,'err');}
+}
+async function addCommissioningItem(){
+  const proj=document.getElementById('cm-pf')?.value;
+  if(!proj){toast('اختر مشروع أولاً','err');return;}
+  const panel_name=prompt('اسم اللوحة/الحلقة (مثال: LCP-28):');if(!panel_name)return;
+  const serving_equipment=prompt('تخدم أي معدة/منطقة (اختياري):','');
+  try{await API.post('/commissioning/'+proj,{panel_name,serving_equipment});renderCommissioning();}
+  catch(e){toast(e.message,'err');}
+}
+async function importCommissioning(input){
+  const file=input.files[0];if(!file)return;
+  const proj=document.getElementById('cm-pf')?.value;
+  if(!proj){alert('اختر مشروع أولاً عشان نربط اللوحات المستوردة بيه');input.value='';return;}
+  const fd=new FormData();fd.append('file',file);
+  try{
+    const res=await fetch(API.base+'/commissioning/'+proj+'/import',{method:'POST',headers:{'Authorization':'Bearer '+API.token},body:fd});
+    const data=await res.json();
+    if(!res.ok)throw new Error(data.error||'فشل الاستيراد');
+    toast(`تم الاستيراد: ${data.created} لوحة جديدة، ${data.updated} تحديث`,'ok');
+    renderCommissioning();
+  }catch(e){toast(e.message||'فشل استيراد الملف','err');}
+  input.value='';
+}
+
+// ══ ISSUES LOG ══
+const IS_STATUS_COLOR={'Open':'#f05a5a','Closed':'#22c87a','Done with notes':'#9b72f4'};
+function isColor(s){return IS_STATUS_COLOR[s]||'#f0a030';}
+
+async function renderIssues(){
+  initSels();
+  const proj=document.getElementById('is-pf')?.value;
+  const summaryEl=document.getElementById('is-summary'),contentEl=document.getElementById('issues-content');
+  if(!proj){contentEl.innerHTML='<div class="empty">اختر مشروع من القائمة</div>';summaryEl.innerHTML='';return;}
+  contentEl.innerHTML='<div class="loading"><i class="ti ti-loader-2"></i></div>';
+  try{
+    const items=await API.get('/issues/'+proj);
+    const open=items.filter(i=>i.status==='Open').length,closed=items.filter(i=>i.status==='Closed').length;
+    summaryEl.innerHTML=`<span class="pill" style="background:#f05a5a18;color:#f05a5a;margin-left:6px">مفتوحة: ${open}</span><span class="pill" style="background:#22c87a18;color:#22c87a">مغلقة: ${closed}</span>`;
+    contentEl.innerHTML=items.length?(`<table class="stbl"><tr><th>#</th><th>Phase</th><th>System</th><th>المشكلة</th><th>المسؤول</th><th>الحالة</th><th>تاريخ الفتح</th><th></th></tr>
+      ${items.map(it=>`<tr>
+        <td>${it.sn||'-'}</td><td>${it.phase||'-'}</td><td>${it.system_name||'-'}</td>
+        <td style="max-width:280px;white-space:normal">${it.issue}</td>
+        <td>${it.responsible||'-'}</td>
+        <td><select class="fsel" style="font-size:11px;color:${isColor(it.status)}" onchange="updateIssueStatus(${it.id},this.value)">
+          ${['Open','Closed','Done with notes'].map(s=>`<option value="${s}" ${it.status===s?'selected':''}>${s}</option>`).join('')}
+        </select></td>
+        <td style="font-size:11px">${it.open_date||'-'}</td>
+        <td><button class="tbtn" onclick="viewIssue(${it.id})"><i class="ti ti-eye"></i></button>
+        <button class="tbtn" onclick="deleteIssue(${it.id})"><i class="ti ti-trash"></i></button></td>
+      </tr>`).join('')}</table>`)
+      :'<div class="empty">لا توجد مشاكل مسجلة لهذا المشروع بعد</div>';
+    window._issuesCache=items;
+  }catch(e){contentEl.innerHTML='<div class="empty">فشل تحميل البيانات</div>';}
+}
+function viewIssue(id){
+  const it=(window._issuesCache||[]).find(i=>i.id===id);if(!it)return;
+  alert(`المشكلة: ${it.issue}\n\nالسبب: ${it.reasons||'-'}\n\nالإجراء المقترح: ${it.corrective_action||'-'}\n\nملاحظة: ${it.remark||'-'}`);
+}
+async function updateIssueStatus(id,status){
+  try{await API.put('/issues/item/'+id,{status});toast('تم التحديث','ok');renderIssues();}catch(e){toast(e.message,'err');}
+}
+async function deleteIssue(id){
+  if(!confirm('حذف هذه المشكلة؟'))return;
+  try{await API.del('/issues/item/'+id);renderIssues();}catch(e){toast(e.message,'err');}
+}
+async function addIssue(){
+  const proj=document.getElementById('is-pf')?.value;
+  if(!proj){toast('اختر مشروع أولاً','err');return;}
+  const issue=prompt('وصف المشكلة:');if(!issue)return;
+  const phase=prompt('المرحلة (اختياري، مثال: Communication):','');
+  const system_name=prompt('النظام/الموقع (اختياري):','');
+  const responsible=prompt('المسؤول (اختياري):','');
+  try{await API.post('/issues/'+proj,{issue,phase,system_name,responsible});renderIssues();}
+  catch(e){toast(e.message,'err');}
+}
+async function importIssues(input){
+  const file=input.files[0];if(!file)return;
+  const proj=document.getElementById('is-pf')?.value;
+  if(!proj){alert('اختر مشروع أولاً');input.value='';return;}
+  const fd=new FormData();fd.append('file',file);
+  try{
+    const res=await fetch(API.base+'/issues/'+proj+'/import',{method:'POST',headers:{'Authorization':'Bearer '+API.token},body:fd});
+    const data=await res.json();
+    if(!res.ok)throw new Error(data.error||'فشل الاستيراد');
+    toast(`تم الاستيراد: ${data.created} جديد، ${data.updated} تحديث`,'ok');
+    renderIssues();
+  }catch(e){toast(e.message||'فشل استيراد الملف','err');}
+  input.value='';
+}
+
+// ══ DOCUMENTS EXCEL IMPORT (Deliverable / Pre-Requisite) ══
+async function importDocsExcel(input,sheetType){
+  const file=input.files[0];if(!file)return;
+  const proj=document.getElementById('doc-pf')?.value;
+  if(!proj){alert('اختر مشروع أولاً عشان نربط المستندات المستوردة بيه');input.value='';return;}
+  const fd=new FormData();fd.append('file',file);fd.append('sheet',sheetType);
+  try{
+    const res=await fetch(API.base+'/documents/'+proj+'/import-excel',{method:'POST',headers:{'Authorization':'Bearer '+API.token},body:fd});
+    const data=await res.json();
+    if(!res.ok)throw new Error(data.error||'فشل الاستيراد');
+    toast(`تم استيراد ${data.added} مستند من شيت ${data.sheet}`,'ok');
+    renderDocuments();
+  }catch(e){toast(e.message||'فشل استيراد الملف','err');}
+  input.value='';
 }
 
 async function downloadReport(format){

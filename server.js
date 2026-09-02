@@ -42,11 +42,6 @@ app.get('/health', (req, res) => res.json({
   time: new Date().toISOString()
 }));
 
-// SPA fallback
-app.get('*', (req, res) => {
-  res.sendFile(path.join(__dirname, 'public', 'index.html'));
-});
-
 // ── START ──────────────────────────────────────────────────────────────────
 async function start() {
   try {
@@ -116,6 +111,18 @@ app.use('/api/documents', require('./routes/documents').router);
 
 // Portfolio — cross-project dashboard, resource allocation, dependencies, templates
 app.use('/api/portfolio', require('./routes/portfolio'));
+
+// Commissioning matrix — panel/loop checklist (Communication/Programming/Commissioning/Validation/Handover)
+app.use('/api/commissioning', require('./routes/commissioning'));
+
+// Issues Log — site/commissioning issue tracking
+app.use('/api/issues', require('./routes/issues'));
+
+// SPA fallback — MUST be registered after every /api/* route above,
+// otherwise it intercepts API requests and returns the HTML page instead of JSON.
+app.get('*', (req, res) => {
+  res.sendFile(path.join(__dirname, 'public', 'index.html'));
+});
 
 // Weekly auto-report scheduler (runs every Sunday at 8am)
 async function runWeeklyReport() {

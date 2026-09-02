@@ -172,4 +172,91 @@ router.post('/check/run', authMiddleware, async (req, res) => {
   } catch (e) { res.status(500).json({ error: e.message }); }
 });
 
+// ══════════════════════════════════════════════════════════════
+// EXCEL IMPORT — imports the real "Deliverable" / "Pre-Requisite" sheet
+// layouts used at ATECH into project_documents.
+// ══════════════════════════════════════════════════════════════
+const multer = require('multer');
+const ExcelJS = require('exceljs');
+const upload = multer({ storage: multer.memoryStorage(), limits: { fileSize: 10 * 1024 * 1024 } });
+
+function cellText(cell) {
+  const v = cell.value;
+  if (v == null) return '';
+  if (v instanceof Date) return v.toISOString().slice(0, 10);
+  if (typeof v === 'object') {
+    if (Array.isArray(v.richText)) return v.richText.map(t => t.text).join('');
+    if (v.text) return String(v.text);
+    return '';
+  }
+  return String(v).trim();
+}
+function mapImportedStatus(raw) {
+  const s = raw.toLowerCase();
+  if (!s || s === '-') return 'missing';
+  if (s.includes('revision') || s.includes('progress')) return 'under_review';
+  if (s.includes('done')) return 'approved';
+  return 'uploaded';
+}
+
+// POST /api/documents/:project/import-excel  (multipart: file, sheet: 'deliverable'|'pre_requisite')
+router.post('/:project/import-excel', authMiddleware, requireRole('admin', 'pm', 'lead'), upload.single('file'), async (req, res) => {
+  if (!req.file) return res.status(400).json({ error: 'ملف Excel مطلوب' });
+  const sheetType = req.body.sheet === 'pre_requisite' ? 'pre_requisite' : 'deliverable';
+  try {
+    const wb = new ExcelJS.Workbook();
+    await wb.xlsx.load(req.file.buffer);
+    const sheetName = sheetType === 'pre_requisite' ? 'Pre-Requisite' : 'Deliverable';
+    const ws = wb.worksheets.find(s => s.name.trim() === sheetName) || wb.worksheets[0];
+    if (!ws) return res.status(400).json({ error: `مفيش شيت اسمه ${sheetName} في الملف` });
+
+    const mergedStartRows = new Set();
+    (ws.model.merges || []).forEach(m => {
+      const mm = m.match(/^A(\d+):/);
+      if (mm) mergedStartRows.add(+mm[1]);
+    });
+
+    const statusCol = sheetType === 'pre_requisite' ? 4 : 5; // Availability vs Status
+    const submissionCol = sheetType === 'pre_requisite' ? 5 : 6;
+    const remarkCol = sheetType === 'pre_requisite' ? 6 : 7;
+    const defaultCategory = sheetType === 'pre_requisite' ? 'pre-requisite' : 'general';
+
+    let currentCategory = defaultCategory;
+    let added = 0, skipped = 0;
+
+    for (let r = 1; r <= ws.rowCount; r++) {
+      if (mergedStartRows.has(r)) {
+        const nextIsHeader = cellText(ws.getCell(r + 1, 1)) === '#';
+        if (nextIsHeader) currentCategory = cellText(ws.getCell(r, 1)) || defaultCategory;
+        continue; // skip category title rows and any other merged note rows
+      }
+      if (cellText(ws.getCell(r, 1)) === '#') continue; // repeated header row
+      const name = cellText(ws.getCell(r, 2));
+      if (!name) continue;
+
+      const rawStatus = cellText(ws.getCell(r, statusCol));
+      const status = mapImportedStatus(rawStatus);
+      const submissionDate = cellText(ws.getCell(r, submissionCol));
+      const remark = cellText(ws.getCell(r, remarkCol));
+      const dueDate = /^\d{4}-\d{2}-\d{2}$/.test(submissionDate) ? submissionDate : null;
+      const notes = [rawStatus && rawStatus !== '-' ? `الحالة الأصلية: ${rawStatus}` : null, remark && remark !== '-' ? remark : null]
+        .filter(Boolean).join(' — ') || null;
+
+      const existing = await pool.query('SELECT id FROM project_documents WHERE project_id=$1 AND name=$2', [req.params.project, name]);
+      if (existing.rows.length) {
+        await pool.query('UPDATE project_documents SET status=$1, due_date=COALESCE($2,due_date), notes=COALESCE($3,notes), category=$4, updated_at=NOW() WHERE id=$5',
+          [status, dueDate, notes, currentCategory, existing.rows[0].id]);
+      } else {
+        await pool.query(
+          'INSERT INTO project_documents (project_id, name, category, status, due_date, notes, created_by) VALUES ($1,$2,$3,$4,$5,$6,$7)',
+          [req.params.project, name, currentCategory, status, dueDate, notes, req.user.id]
+        );
+      }
+      added++;
+    }
+
+    res.json({ added, skipped, sheet: sheetName });
+  } catch (e) { res.status(400).json({ error: 'فشل قراءة ملف Excel: ' + e.message }); }
+});
+
 module.exports = { router, runDocumentCheck, applyDocumentTemplate };
