@@ -56,7 +56,7 @@ const hc=s=>s>=80?'#22c87a':s>=60?'#f0a030':'#f05a5a';
 const hl=s=>s>=80?'ممتاز':s>=60?'متوسط':'ضعيف';
 
 function initSels(){
-  [['ft-proj','proj'],['kb-pf','proj'],['g-pf','proj'],['tl-pf','proj'],['sr-pf','proj'],['doc-pf','proj'],['cm-pf','proj'],['is-pf','proj'],
+  [['ft-proj','proj'],['kb-pf','proj'],['g-pf','proj'],['tl-pf','proj'],['sr-pf','proj'],['doc-pf','proj'],['cm-pf','proj'],['is-pf','proj'],['rk-pf','proj'],['co-pf','proj'],['cpm-pf','proj'],
    ['fp-lead','team'],['ft-assign','team'],['kb-af','team'],['ms-proj','proj']].forEach(([id,type])=>{
     const s=document.getElementById(id);if(!s)return;
     const v=s.value;
@@ -135,7 +135,7 @@ async function refreshData(){
 setInterval(refreshData,30000);
 
 // ══ NAV ══
-const PT={dashboard:['لوحة التحكم','نظرة عامة'],projects:['المشاريع','إدارة المشاريع'],kanban:['Kanban Board','تتبع المهام'],gantt:['Gantt Chart','الجدول الزمني'],timeline:['Timeline','الخط الزمني'],team:['الفريق','أعضاء الفريق'],sitereport:['Site Report اليومي','تقارير الأداء'],log:['سجل النشاط','مسجل على الخادم'],settings:['الإعدادات','إعدادات النظام'],documents:['تتبع المستندات','المستندات الناقصة والمتأخرة'],portfolio:['Portfolio','إدارة المشاريع المتعددة'],commissioning:['مصفوفة الإنجاز','تدقيق تفصيلي لكل لوحة عبر مراحل الإنجاز'],issues:['Issues Log','تتبع مشاكل الموقع والتشغيل']};
+const PT={dashboard:['لوحة التحكم','نظرة عامة'],projects:['المشاريع','إدارة المشاريع'],kanban:['Kanban Board','تتبع المهام'],gantt:['Gantt Chart','الجدول الزمني'],timeline:['Timeline','الخط الزمني'],team:['الفريق','أعضاء الفريق'],sitereport:['Site Report اليومي','تقارير الأداء'],log:['سجل النشاط','مسجل على الخادم'],settings:['الإعدادات','إعدادات النظام'],documents:['تتبع المستندات','المستندات الناقصة والمتأخرة'],portfolio:['Portfolio','إدارة المشاريع المتعددة'],commissioning:['مصفوفة الإنجاز','تدقيق تفصيلي لكل لوحة عبر مراحل الإنجاز'],issues:['Issues Log','تتبع مشاكل الموقع والتشغيل'],risks:['سجل المخاطر','مخاطر محتملة — احتمالية × تأثير'],changeorders:['إدارة التغييرات','طلبات تغيير النطاق/التكلفة/الجدول الزمني'],cpm:['الجدولة الزمنية (CPM)','المسار الحرج بناءً على علاقات المهام']};
 async function goto(pg){
   if(pg==='team'&&!can('view_team')){toast('ليس لديك صلاحية','err');return;}
   if(pg==='settings'&&!can('settings')){toast('ليس لديك صلاحية','err');return;}
@@ -159,6 +159,9 @@ async function goto(pg){
   else if(pg==='portfolio')renderPortfolio();
   else if(pg==='commissioning')renderCommissioning();
   else if(pg==='issues')renderIssues();
+  else if(pg==='risks')renderRisks();
+  else if(pg==='changeorders')renderChangeOrders();
+  else if(pg==='cpm')renderCPM();
 }
 function toggleSB(){sbMini=!sbMini;document.getElementById('sb').classList.toggle('mini',sbMini);document.getElementById('sb-ic').className=sbMini?'ti ti-layout-sidebar-left-expand':'ti ti-layout-sidebar-right-collapse';}
 
@@ -348,14 +351,14 @@ function openTM(col,id){
   if(!can('add_task')){toast('ليس لديك صلاحية','err');return;}
   editTId=id||null;document.getElementById('tm-lbl').textContent=id?'تعديل المهمة':'مهمة جديدة';
   initSels();
-  if(id){const t=tasks.find(x=>x.id===id);if(!t)return;document.getElementById('ft-title').value=t.title;document.getElementById('ft-proj').value=t.project_id||'';document.getElementById('ft-col').value=t.col;document.getElementById('ft-prio').value=t.priority;document.getElementById('ft-assign').value=t.assigned_to||'';document.getElementById('ft-date').value=t.due_date||'';document.getElementById('ft-hours').value=t.hours_estimated||'';document.getElementById('ft-notes').value=t.notes||'';}
-  else{['ft-title','ft-date','ft-hours','ft-notes'].forEach(x=>document.getElementById(x).value='');document.getElementById('ft-prio').value='med';if(col)document.getElementById('ft-col').value=col;}
+  if(id){const t=tasks.find(x=>x.id===id);if(!t)return;document.getElementById('ft-title').value=t.title;document.getElementById('ft-proj').value=t.project_id||'';document.getElementById('ft-col').value=t.col;document.getElementById('ft-prio').value=t.priority;document.getElementById('ft-assign').value=t.assigned_to||'';document.getElementById('ft-date').value=t.due_date||'';document.getElementById('ft-hours').value=t.hours_estimated||'';document.getElementById('ft-start').value=t.start_date||'';document.getElementById('ft-duration').value=t.duration_days||1;document.getElementById('ft-notes').value=t.notes||'';}
+  else{['ft-title','ft-date','ft-hours','ft-start','ft-notes'].forEach(x=>document.getElementById(x).value='');document.getElementById('ft-duration').value=1;document.getElementById('ft-prio').value='med';if(col)document.getElementById('ft-col').value=col;}
   document.getElementById('tm').classList.add('open');
 }
 function closeTM(){document.getElementById('tm').classList.remove('open');}
 async function saveTask(){
   const title=document.getElementById('ft-title').value.trim();if(!title){toast('أدخل عنوان المهمة','err');return;}
-  const body={title,project_id:document.getElementById('ft-proj').value,col:document.getElementById('ft-col').value,priority:document.getElementById('ft-prio').value,assigned_to:document.getElementById('ft-assign').value,due_date:document.getElementById('ft-date').value||null,hours_estimated:parseInt(document.getElementById('ft-hours').value)||0,notes:document.getElementById('ft-notes').value};
+  const body={title,project_id:document.getElementById('ft-proj').value,col:document.getElementById('ft-col').value,priority:document.getElementById('ft-prio').value,assigned_to:document.getElementById('ft-assign').value,due_date:document.getElementById('ft-date').value||null,hours_estimated:parseInt(document.getElementById('ft-hours').value)||0,start_date:document.getElementById('ft-start').value||null,duration_days:parseInt(document.getElementById('ft-duration').value)||1,notes:document.getElementById('ft-notes').value};
   try{if(editTId)await API.put('/tasks/'+editTId,body);else await API.post('/tasks',body);closeTM();await refreshData();toast(editTId?'تم التعديل':'تمت الإضافة','ok');}catch(e){toast(e.message,'err');}
 }
 
@@ -843,6 +846,191 @@ async function downloadReport(format){
     document.body.appendChild(a);a.click();a.remove();
     URL.revokeObjectURL(url);
   }catch(e){alert(e.message||'فشل تحميل التقرير');}
+}
+
+// ══ RISK REGISTER ══
+const RK_LEVEL={high:{l:'عالية',c:'#f05a5a'},medium:{l:'متوسطة',c:'#f0a030'},low:{l:'منخفضة',c:'#22c87a'}};
+const RK_CAT={technical:'تقني',schedule:'جدول زمني',cost:'تكلفة',quality:'جودة',safety:'سلامة',external:'خارجي'};
+
+async function renderRisks(){
+  initSels();
+  const proj=document.getElementById('rk-pf')?.value;
+  const summaryEl=document.getElementById('rk-summary'),contentEl=document.getElementById('risks-content');
+  if(!proj){contentEl.innerHTML='<div class="empty">اختر مشروع من القائمة</div>';summaryEl.innerHTML='';return;}
+  contentEl.innerHTML='<div class="loading"><i class="ti ti-loader-2"></i></div>';
+  try{
+    const items=await API.get('/risks/'+proj);
+    const high=items.filter(r=>r.level==='high'&&r.status==='open').length;
+    summaryEl.innerHTML=`<span class="pill" style="background:#f05a5a18;color:#f05a5a;margin-left:6px">عالية: ${high}</span><span class="pill" style="background:var(--bg3);color:var(--t3)">إجمالي: ${items.length}</span>`;
+    contentEl.innerHTML=items.length?(`<table class="stbl"><tr><th>#</th><th>الوصف</th><th>الفئة</th><th>احتمالية×تأثير</th><th>الخطورة</th><th>المسؤول</th><th>الحالة</th><th></th></tr>
+      ${items.map(r=>`<tr>
+        <td>${r.rn||'-'}</td>
+        <td style="max-width:260px;white-space:normal">${r.description}</td>
+        <td>${RK_CAT[r.category]||r.category}</td>
+        <td>${r.probability}×${r.impact}=${r.score}</td>
+        <td><span class="pill" style="background:${RK_LEVEL[r.level].c}18;color:${RK_LEVEL[r.level].c}">${RK_LEVEL[r.level].l}</span></td>
+        <td>${r.owner||'-'}</td>
+        <td><select class="fsel" style="font-size:11px" onchange="updateRiskStatus(${r.id},this.value)">
+          ${['open','mitigated','occurred','closed'].map(s=>`<option value="${s}" ${r.status===s?'selected':''}>${s}</option>`).join('')}
+        </select></td>
+        <td><button class="tbtn" onclick="viewRisk(${r.id})"><i class="ti ti-eye"></i></button>
+        <button class="tbtn" onclick="deleteRisk(${r.id})"><i class="ti ti-trash"></i></button></td>
+      </tr>`).join('')}</table>`)
+      :'<div class="empty">لا توجد مخاطر مسجلة لهذا المشروع بعد</div>';
+    window._risksCache=items;
+  }catch(e){contentEl.innerHTML='<div class="empty">فشل تحميل البيانات</div>';}
+}
+function viewRisk(id){
+  const r=(window._risksCache||[]).find(x=>x.id===id);if(!r)return;
+  alert(`الخطر: ${r.description}\n\nخطة التخفيف: ${r.mitigation_plan||'-'}\n\nالخطة الاحتياطية: ${r.contingency_plan||'-'}`);
+}
+async function updateRiskStatus(id,status){
+  try{await API.put('/risks/item/'+id,{status});toast('تم التحديث','ok');renderRisks();}catch(e){toast(e.message,'err');}
+}
+async function deleteRisk(id){
+  if(!confirm('حذف هذا الخطر؟'))return;
+  try{await API.del('/risks/item/'+id);renderRisks();}catch(e){toast(e.message,'err');}
+}
+async function addRisk(){
+  const proj=document.getElementById('rk-pf')?.value;
+  if(!proj){toast('اختر مشروع أولاً','err');return;}
+  const description=prompt('وصف الخطر:');if(!description)return;
+  const probability=prompt('احتمالية الحدوث (1-5):','3');
+  const impact=prompt('حجم التأثير لو حصل (1-5):','3');
+  const owner=prompt('المسؤول عن متابعة الخطر (اختياري):','');
+  const mitigation_plan=prompt('خطة التخفيف (اختياري):','');
+  try{await API.post('/risks/'+proj,{description,probability:+probability||3,impact:+impact||3,owner,mitigation_plan});renderRisks();}
+  catch(e){toast(e.message,'err');}
+}
+
+// ══ CHANGE ORDERS ══
+const CO_STATUS={proposed:{l:'مقترح',c:'#5c657e'},under_review:{l:'تحت المراجعة',c:'#f0a030'},approved:{l:'معتمد',c:'#22c87a'},rejected:{l:'مرفوض',c:'#f05a5a'},implemented:{l:'منفّذ',c:'#4f8ef7'}};
+
+async function renderChangeOrders(){
+  initSels();
+  const proj=document.getElementById('co-pf')?.value;
+  const summaryEl=document.getElementById('co-summary'),contentEl=document.getElementById('co-content');
+  if(!proj){contentEl.innerHTML='<div class="empty">اختر مشروع من القائمة</div>';summaryEl.innerHTML='';return;}
+  contentEl.innerHTML='<div class="loading"><i class="ti ti-loader-2"></i></div>';
+  try{
+    const items=await API.get('/change-orders/'+proj);
+    const approvedCost=items.filter(c=>c.status==='approved'||c.status==='implemented').reduce((a,c)=>a+(+c.cost_impact||0),0);
+    summaryEl.innerHTML=`<span class="pill" style="background:#22c87a18;color:#22c87a;margin-left:6px">إجمالي المعتمد: SAR ${approvedCost.toLocaleString('en-US')}</span><span class="pill" style="background:var(--bg3);color:var(--t3)">إجمالي الطلبات: ${items.length}</span>`;
+    contentEl.innerHTML=items.length?(`<table class="stbl"><tr><th>رقم</th><th>العنوان</th><th>تأثير التكلفة</th><th>تأثير الجدول</th><th>الحالة</th><th></th></tr>
+      ${items.map(c=>`<tr>
+        <td style="font-family:monospace;font-size:11px">${c.co_number}</td>
+        <td>${c.title}</td>
+        <td>${c.cost_impact>0?'+':''}${(+c.cost_impact).toLocaleString('en-US')} SAR</td>
+        <td>${c.schedule_impact_days>0?'+':''}${c.schedule_impact_days} يوم</td>
+        <td><select class="fsel" style="font-size:11px;color:${CO_STATUS[c.status].c}" onchange="updateCOStatus(${c.id},this.value)">
+          ${Object.entries(CO_STATUS).map(([k,v])=>`<option value="${k}" ${c.status===k?'selected':''}>${v.l}</option>`).join('')}
+        </select></td>
+        <td><button class="tbtn" onclick="viewCO(${c.id})"><i class="ti ti-eye"></i></button>
+        <button class="tbtn" onclick="deleteCO(${c.id})"><i class="ti ti-trash"></i></button></td>
+      </tr>`).join('')}</table>`)
+      :'<div class="empty">لا توجد طلبات تغيير لهذا المشروع بعد</div>';
+    window._coCache=items;
+  }catch(e){contentEl.innerHTML='<div class="empty">فشل تحميل البيانات</div>';}
+}
+function viewCO(id){
+  const c=(window._coCache||[]).find(x=>x.id===id);if(!c)return;
+  alert(`${c.co_number}: ${c.title}\n\nالوصف: ${c.description||'-'}\n\nالسبب: ${c.reason||'-'}\n\nطلبها: ${c.requested_by||'-'}`);
+}
+async function updateCOStatus(id,status){
+  try{
+    await API.put('/change-orders/item/'+id,{status});
+    toast(status==='approved'?'تم الاعتماد — تحديث الميزانية تلقائياً':'تم التحديث','ok');
+    renderChangeOrders();
+  }catch(e){toast(e.message,'err');}
+}
+async function deleteCO(id){
+  if(!confirm('حذف طلب التغيير؟ لو كان معتمد هيتم تعديل الميزانية تلقائياً'))return;
+  try{await API.del('/change-orders/item/'+id);renderChangeOrders();}catch(e){toast(e.message,'err');}
+}
+async function addChangeOrder(){
+  const proj=document.getElementById('co-pf')?.value;
+  if(!proj){toast('اختر مشروع أولاً','err');return;}
+  const title=prompt('عنوان التغيير:');if(!title)return;
+  const description=prompt('الوصف (اختياري):','');
+  const reason=prompt('السبب (اختياري):','');
+  const cost_impact=prompt('تأثير التكلفة بالريال (رقم موجب للزيادة، سالب للتوفير):','0');
+  const schedule_impact_days=prompt('تأثير الجدول الزمني بالأيام:','0');
+  try{await API.post('/change-orders/'+proj,{title,description,reason,cost_impact:+cost_impact||0,schedule_impact_days:+schedule_impact_days||0});renderChangeOrders();}
+  catch(e){toast(e.message,'err');}
+}
+
+// ══ CRITICAL PATH METHOD (CPM) ══
+async function renderCPM(){
+  initSels();
+  const proj=document.getElementById('cpm-pf')?.value;
+  const summaryEl=document.getElementById('cpm-summary'),contentEl=document.getElementById('cpm-content');
+  if(!proj){contentEl.innerHTML='<div class="empty">اختر مشروع من القائمة</div>';summaryEl.innerHTML='';return;}
+  contentEl.innerHTML='<div class="loading"><i class="ti ti-loader-2"></i></div>';
+  try{
+    const [cpmData,deps]=await Promise.all([API.get('/dependencies/'+proj+'/critical-path'),API.get('/dependencies/'+proj)]);
+    window._cpmTasksCache=cpmData.tasks;
+    if(!cpmData.tasks.length){contentEl.innerHTML='<div class="empty">لا توجد مهام لهذا المشروع بعد</div>';summaryEl.innerHTML='';return;}
+
+    summaryEl.innerHTML=`<div class="kcard" style="max-width:260px;display:inline-block;margin-left:10px"><div class="kval">${cpmData.projectDurationDays}</div><div class="klbl">إجمالي مدة المشروع (يوم)</div></div>
+      <div class="kcard" style="max-width:260px;display:inline-block"><div class="kval" style="color:#f05a5a">${cpmData.criticalPath.length}</div><div class="klbl">مهمة على المسار الحرج</div></div>`;
+
+    const sorted=[...cpmData.tasks].sort((a,b)=>a.es-b.es);
+    contentEl.innerHTML=`
+      <table class="stbl" style="margin-bottom:16px"><tr><th>المهمة</th><th>المدة (يوم)</th><th>ES</th><th>EF</th><th>LS</th><th>LF</th><th>Float</th><th>حرجة؟</th></tr>
+      ${sorted.map(t=>`<tr style="${t.is_critical?'background:#f05a5a12':''}">
+        <td>${t.is_critical?'<i class="ti ti-flame" style="color:#f05a5a;margin-left:4px"></i>':''}<strong>${t.title}</strong></td>
+        <td>${t.duration_days||1}</td><td>${t.es}</td><td>${t.ef}</td><td>${t.ls}</td><td>${t.lf}</td>
+        <td style="color:${t.float===0?'#f05a5a':'var(--t3)'};font-weight:${t.float===0?700:400}">${t.float}</td>
+        <td>${t.is_critical?'<span class="pill" style="background:#f05a5a18;color:#f05a5a">نعم</span>':'-'}</td>
+      </tr>`).join('')}</table>
+
+      <div class="stsub" style="margin-bottom:8px">الروابط الحالية بين المهام</div>
+      ${deps.length?(`<table class="stbl"><tr><th>من</th><th>النوع</th><th>إلى</th><th>Lag</th><th></th></tr>
+        ${deps.map(d=>`<tr><td>${d.predecessor_title}</td><td>${d.type}</td><td>${d.successor_title}</td><td>${d.lag_days} يوم</td>
+          <td><button class="tbtn" onclick="deleteDependency2(${d.id})"><i class="ti ti-trash"></i></button></td></tr>`).join('')}</table>`)
+        :'<div class="empty">لا توجد روابط بين المهام بعد — دوسي "ربط مهام" لتحديد ترتيب التنفيذ</div>'}
+    `;
+  }catch(e){
+    if(e.message&&e.message.includes('دائرة'))contentEl.innerHTML=`<div class="empty" style="color:#f05a5a">${e.message}</div>`;
+    else contentEl.innerHTML='<div class="empty">فشل تحميل البيانات</div>';
+  }
+}
+async function linkTasks(){
+  const proj=document.getElementById('cpm-pf')?.value;
+  if(!proj){toast('اختر مشروع أولاً','err');return;}
+  try{
+    const tasksList=tasks.filter(t=>t.project_id===proj);
+    if(!tasksList.length){toast('لا توجد مهام في هذا المشروع','err');return;}
+    const names=tasksList.map((t,i)=>`${i+1}) ${t.title} [ID:${t.id}]`).join('\n');
+    const predId=prompt('ID المهمة السابقة (Predecessor):\n'+names);if(!predId)return;
+    const succId=prompt('ID المهمة اللاحقة (Successor):');if(!succId)return;
+    const type=prompt('نوع العلاقة: FS (الافتراضي) / SS / FF / SF','FS');
+    const lag_days=prompt('فترة تأخير بالأيام (0 لو مفيش):','0');
+    await API.post('/dependencies',{predecessor_id:+predId,successor_id:+succId,type:(type||'FS').trim().toUpperCase(),lag_days:+lag_days||0});
+    toast('تم الربط','ok');renderCPM();
+  }catch(e){toast(e.message,'err');}
+}
+async function deleteDependency2(id){
+  if(!confirm('حذف هذا الربط؟'))return;
+  try{await API.del('/dependencies/'+id);renderCPM();}catch(e){toast(e.message,'err');}
+}
+
+async function runRiskAnalysis(){
+  const box=document.getElementById('ai-msgs');
+  box.innerHTML+=`<div class="aimsg user">تحليل المخاطر — بناءً على Issues Log ومصفوفة الإنجاز والمستندات الناقصة</div>`;box.scrollTop=box.scrollHeight;
+  document.getElementById('ai-typing').style.display='block';
+  const proj=document.getElementById('cm-pf')?.value||document.getElementById('is-pf')?.value||document.getElementById('doc-pf')?.value||null;
+  try{
+    const res=await fetch('/api/ai/risk-analysis',{method:'POST',headers:{'Content-Type':'application/json','Authorization':'Bearer '+API.token},body:JSON.stringify({project_id:proj})});
+    const data=await res.json();
+    document.getElementById('ai-typing').style.display='none';
+    if(!res.ok){box.innerHTML+=`<div class="aimsg bot" style="color:var(--red)">${data.error||'فشل التحليل'}</div>`;}
+    else{
+      const scopeNote=proj?`<div style="font-size:10px;color:var(--t3);margin-bottom:6px">نطاق التحليل: ${proj}</div>`:'';
+      box.innerHTML+=`<div class="aimsg bot">${scopeNote}${data.analysis.replace(/\n/g,'<br>')}</div>`;
+    }
+    box.scrollTop=box.scrollHeight;
+  }catch(e){document.getElementById('ai-typing').style.display='none';box.innerHTML+=`<div class="aimsg bot" style="color:var(--red)">فشل الاتصال بخدمة التحليل</div>`;}
 }
 
 async function askAI(q){document.getElementById('ai-q').value=q;await sendAI();}

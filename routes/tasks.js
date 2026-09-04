@@ -28,13 +28,13 @@ router.get('/', authMiddleware, async (req, res) => {
 
 // POST create task
 router.post('/', authMiddleware, requireRole('admin', 'pm', 'lead', 'engineer'), async (req, res) => {
-  const { title, project_id, priority, col, assigned_to, due_date, hours_estimated, notes } = req.body;
+  const { title, project_id, priority, col, assigned_to, due_date, hours_estimated, start_date, duration_days, notes } = req.body;
   if (!title) return res.status(400).json({ error: 'عنوان المهمة مطلوب' });
   try {
     const { rows } = await pool.query(
-      `INSERT INTO tasks (title,project_id,priority,col,assigned_to,due_date,hours_estimated,notes,created_by)
-       VALUES ($1,$2,$3,$4,$5,$6,$7,$8,$9) RETURNING *`,
-      [title, project_id, priority||'med', col||'todo', assigned_to||'', due_date||null, hours_estimated||0, notes||'', req.user.id]
+      `INSERT INTO tasks (title,project_id,priority,col,assigned_to,due_date,hours_estimated,start_date,duration_days,notes,created_by)
+       VALUES ($1,$2,$3,$4,$5,$6,$7,$8,$9,$10,$11) RETURNING *`,
+      [title, project_id, priority||'med', col||'todo', assigned_to||'', due_date||null, hours_estimated||0, start_date||null, duration_days||1, notes||'', req.user.id]
     );
     await log(pool, 'task', `إضافة مهمة: ${title}`, 'ti-circle-plus', '#22c87a', req.user.id, req.user.name);
     triggerWebhooks('task.created', rows[0]);
@@ -44,7 +44,7 @@ router.post('/', authMiddleware, requireRole('admin', 'pm', 'lead', 'engineer'),
 
 // PUT update task
 router.put('/:id', authMiddleware, async (req, res) => {
-  const { title, project_id, priority, col, assigned_to, due_date, hours_estimated, notes } = req.body;
+  const { title, project_id, priority, col, assigned_to, due_date, hours_estimated, start_date, duration_days, notes } = req.body;
   try {
     // Engineer can only update own tasks
     if (req.user.role === 'engineer') {
@@ -57,10 +57,11 @@ router.put('/:id', authMiddleware, async (req, res) => {
         title=COALESCE($1,title), project_id=COALESCE($2,project_id),
         priority=COALESCE($3,priority), col=COALESCE($4,col),
         assigned_to=COALESCE($5,assigned_to), due_date=COALESCE($6,due_date),
-        hours_estimated=COALESCE($7,hours_estimated), notes=COALESCE($8,notes),
+        hours_estimated=COALESCE($7,hours_estimated), start_date=COALESCE($8,start_date),
+        duration_days=COALESCE($9,duration_days), notes=COALESCE($10,notes),
         updated_at=NOW()
-       WHERE id=$9 RETURNING *`,
-      [title, project_id, priority, col, assigned_to, due_date||null, hours_estimated, notes, req.params.id]
+       WHERE id=$11 RETURNING *`,
+      [title, project_id, priority, col, assigned_to, due_date||null, hours_estimated, start_date||null, duration_days, notes, req.params.id]
     );
     if (!rows.length) return res.status(404).json({ error: 'المهمة غير موجودة' });
     await log(pool, 'task', `تعديل مهمة: ${rows[0].title}`, 'ti-edit', '#f0a030', req.user.id, req.user.name);

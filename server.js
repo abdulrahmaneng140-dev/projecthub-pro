@@ -60,34 +60,6 @@ async function start() {
 
 start();
 
-// AI route (server-side to protect API key)
-app.post('/api/ai', require('./middleware/auth').authMiddleware, async (req, res) => {
-  const { question, context } = req.body;
-  if (!process.env.ANTHROPIC_API_KEY) {
-    return res.status(503).json({ error: 'ANTHROPIC_API_KEY غير مضاف في إعدادات الخادم' });
-  }
-  try {
-    const r = await fetch('https://api.anthropic.com/v1/messages', {
-      method: 'POST',
-      headers: {
-        'Content-Type': 'application/json',
-        'x-api-key': process.env.ANTHROPIC_API_KEY,
-        'anthropic-version': '2023-06-01'
-      },
-      body: JSON.stringify({
-        model: 'claude-sonnet-4-6',
-        max_tokens: 800,
-        system: `أنت مساعد ذكي لإدارة المشاريع الهندسية — Atech Automation. تتحدث بالعربية المصرية بإيجاز وعملية.\nالمشاريع:\n${context?.projects}\n${context?.tasks}\nالمستخدم: ${context?.user} (${context?.role})\nأجب في 2-4 جمل.`,
-        messages: [{ role: 'user', content: question }]
-      })
-    });
-    const data = await r.json();
-    res.json({ answer: data.content?.[0]?.text || 'لا توجد إجابة' });
-  } catch (e) {
-    res.status(500).json({ error: e.message });
-  }
-});
-
 // KPI, Alerts, Notifications, Email
 app.use('/api/kpi', require('./routes/kpi'));
 
@@ -117,6 +89,18 @@ app.use('/api/commissioning', require('./routes/commissioning'));
 
 // Issues Log — site/commissioning issue tracking
 app.use('/api/issues', require('./routes/issues'));
+
+// AI — project chat assistant + automatic risk analysis
+app.use('/api/ai', require('./routes/ai'));
+
+// Risk Register — formal probability x impact risk tracking
+app.use('/api/risks', require('./routes/risks'));
+
+// Change Orders — scope/cost/schedule variation tracking with approval workflow
+app.use('/api/change-orders', require('./routes/change_orders'));
+
+// Task Dependencies + Critical Path Method (CPM) scheduling
+app.use('/api/dependencies', require('./routes/dependencies'));
 
 // SPA fallback — MUST be registered after every /api/* route above,
 // otherwise it intercepts API requests and returns the HTML page instead of JSON.

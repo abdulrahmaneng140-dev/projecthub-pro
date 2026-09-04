@@ -8,7 +8,7 @@ const { authMiddleware, requireRole } = require('../middleware/auth');
 // (or Zapier/Make/n8n) when events happen. Power Automate side:
 // use "When an HTTP request is received" trigger + this URL.
 // ══════════════════════════════════════════════════════════════
-const VALID_EVENTS = ['task.created', 'task.updated', 'project.status_changed', 'project.over_budget', 'milestone.delayed', 'document.overdue'];
+const VALID_EVENTS = ['task.created', 'task.updated', 'project.status_changed', 'project.over_budget', 'milestone.delayed', 'document.overdue', 'risk.high', 'change_order.approved'];
 
 router.get('/webhooks', authMiddleware, requireRole('admin', 'pm'), async (req, res) => {
   const { rows } = await pool.query('SELECT id,name,target_url,events,enabled,created_at,last_triggered_at,last_status FROM webhook_subscriptions ORDER BY id DESC');

@@ -56,12 +56,29 @@ async function initDB() {
         col VARCHAR(20) DEFAULT 'todo'
           CHECK (col IN ('backlog','todo','doing','review','done')),
         assigned_to VARCHAR(100),
+        start_date DATE,
         due_date DATE,
+        duration_days INTEGER DEFAULT 1,
         hours_estimated INTEGER DEFAULT 0,
         notes TEXT,
         created_by INTEGER REFERENCES users(id),
         created_at TIMESTAMPTZ DEFAULT NOW(),
         updated_at TIMESTAMPTZ DEFAULT NOW()
+      );
+      -- existing installs: add CPM columns if the table predates this feature
+      ALTER TABLE tasks ADD COLUMN IF NOT EXISTS start_date DATE;
+      ALTER TABLE tasks ADD COLUMN IF NOT EXISTS duration_days INTEGER DEFAULT 1;
+
+      -- TASK DEPENDENCIES — for Critical Path Method (CPM) scheduling
+      CREATE TABLE IF NOT EXISTS task_dependencies (
+        id SERIAL PRIMARY KEY,
+        predecessor_id INTEGER REFERENCES tasks(id) ON DELETE CASCADE,
+        successor_id INTEGER REFERENCES tasks(id) ON DELETE CASCADE,
+        type VARCHAR(2) DEFAULT 'FS' CHECK (type IN ('FS','SS','FF','SF')),
+        lag_days INTEGER DEFAULT 0,
+        created_by INTEGER REFERENCES users(id),
+        created_at TIMESTAMPTZ DEFAULT NOW(),
+        UNIQUE(predecessor_id, successor_id)
       );
 
       -- TEAM MEMBERS
@@ -271,7 +288,51 @@ async function initDB() {
         updated_at TIMESTAMPTZ DEFAULT NOW()
       );
 
+      -- RISK REGISTER — formal probability x impact risk tracking (distinct from Issues Log, which tracks things that already happened)
+      CREATE TABLE IF NOT EXISTS risk_register (
+        id SERIAL PRIMARY KEY,
+        project_id VARCHAR(20) REFERENCES projects(id) ON DELETE CASCADE,
+        rn INTEGER,
+        description TEXT NOT NULL,
+        category VARCHAR(50) DEFAULT 'technical'
+          CHECK (category IN ('technical','schedule','cost','quality','safety','external')),
+        probability INTEGER DEFAULT 3 CHECK (probability BETWEEN 1 AND 5),
+        impact INTEGER DEFAULT 3 CHECK (impact BETWEEN 1 AND 5),
+        owner VARCHAR(150),
+        mitigation_plan TEXT,
+        contingency_plan TEXT,
+        status VARCHAR(20) DEFAULT 'open'
+          CHECK (status IN ('open','mitigated','closed','occurred')),
+        identified_date DATE DEFAULT CURRENT_DATE,
+        review_date DATE,
+        created_by INTEGER REFERENCES users(id),
+        created_at TIMESTAMPTZ DEFAULT NOW(),
+        updated_at TIMESTAMPTZ DEFAULT NOW()
+      );
+
+      -- CHANGE ORDERS — formal scope/cost/schedule variation tracking with approval workflow
+      CREATE TABLE IF NOT EXISTS change_orders (
+        id SERIAL PRIMARY KEY,
+        project_id VARCHAR(20) REFERENCES projects(id) ON DELETE CASCADE,
+        co_number VARCHAR(30),
+        title VARCHAR(300) NOT NULL,
+        description TEXT,
+        reason TEXT,
+        requested_by VARCHAR(150),
+        cost_impact NUMERIC DEFAULT 0,
+        schedule_impact_days INTEGER DEFAULT 0,
+        status VARCHAR(20) DEFAULT 'proposed'
+          CHECK (status IN ('proposed','under_review','approved','rejected','implemented')),
+        approved_by VARCHAR(150),
+        approval_date DATE,
+        created_by INTEGER REFERENCES users(id),
+        created_at TIMESTAMPTZ DEFAULT NOW(),
+        updated_at TIMESTAMPTZ DEFAULT NOW()
+      );
+
       -- INDEXES
+      CREATE INDEX IF NOT EXISTS idx_risks_project ON risk_register(project_id);
+      CREATE INDEX IF NOT EXISTS idx_co_project ON change_orders(project_id);
       CREATE INDEX IF NOT EXISTS idx_issues_project ON project_issues(project_id);
       CREATE INDEX IF NOT EXISTS idx_commissioning_project ON commissioning_items(project_id);
       CREATE INDEX IF NOT EXISTS idx_documents_project ON project_documents(project_id);
@@ -279,6 +340,8 @@ async function initDB() {
       CREATE INDEX IF NOT EXISTS idx_deps_from ON project_dependencies(from_project);
       CREATE INDEX IF NOT EXISTS idx_deps_to ON project_dependencies(to_project);
       CREATE INDEX IF NOT EXISTS idx_tasks_project ON tasks(project_id);
+      CREATE INDEX IF NOT EXISTS idx_taskdeps_pred ON task_dependencies(predecessor_id);
+      CREATE INDEX IF NOT EXISTS idx_taskdeps_succ ON task_dependencies(successor_id);
       CREATE INDEX IF NOT EXISTS idx_tasks_col ON tasks(col);
       CREATE INDEX IF NOT EXISTS idx_milestones_project ON milestones(project_id);
       CREATE INDEX IF NOT EXISTS idx_reports_date ON site_reports(report_date);

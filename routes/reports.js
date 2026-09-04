@@ -3,6 +3,7 @@ const PDFDocument = require('pdfkit');
 const ExcelJS = require('exceljs');
 const { pool } = require('../db');
 const { authMiddleware } = require('../middleware/auth');
+const { askClaude } = require('../lib/claude');
 
 // ══════════════════════════════════════════════════════════════
 // SHARED DATA FETCHER — same source data feeds dashboard + reports
@@ -47,6 +48,27 @@ const STATUS_LABEL = { 'on-track': 'On Track', 'at-risk': 'At Risk', 'delayed': 
 const fmtMoney = n => 'SAR ' + Number(n || 0).toLocaleString('en-US');
 
 // ══════════════════════════════════════════════════════════════
+// AI EXECUTIVE SUMMARY — optional 3-4 sentence summary added to the top
+// of PDF reports when ANTHROPIC_API_KEY is configured. Never blocks the
+// report if it fails — returns null and the PDF is built without it.
+// ══════════════════════════════════════════════════════════════
+async function getAISummary(type, data, scopeLabel) {
+  let context = '';
+  if (type === 'progress') {
+    const avg = data.P.length ? Math.round(data.P.reduce((a, p) => a + p.pct, 0) / data.P.length) : 0;
+    context = `Scope: ${scopeLabel}\nProjects: ${data.P.length}\nAverage progress: ${avg}%\nOverdue tasks: ${data.overdueTasks.length}\nDetails: ${data.P.map(p => `${p.name}: ${p.pct}% (SPI ${p.spi})`).join(', ')}`;
+  } else if (type === 'financial') {
+    const totalBudget = data.P.reduce((a, p) => a + (+p.budget || 0), 0);
+    const totalSpent = data.P.reduce((a, p) => a + (+p.spent || 0), 0);
+    context = `Scope: ${scopeLabel}\nTotal budget: SAR ${totalBudget}\nTotal spent: SAR ${totalSpent}\nProjects near/over budget: ${data.overBudgetProjects.map(p => p.name).join(', ') || 'none'}`;
+  } else if (type === 'risk') {
+    context = `Scope: ${scopeLabel}\nAt-risk/delayed projects: ${data.atRiskProjects.map(p => p.name).join(', ') || 'none'}\nOverdue tasks: ${data.overdueTasks.length}\nDelayed milestones: ${data.delayedMs.length}`;
+  }
+  const system = 'You write a short executive summary (3-4 sentences, English) for an engineering project report, in a direct professional tone suitable for senior management. Interpret the numbers rather than just repeating them.';
+  return askClaude(system, context, 300);
+}
+
+// ══════════════════════════════════════════════════════════════
 // PDF BUILDERS
 // ══════════════════════════════════════════════════════════════
 function pdfHeader(doc, title, subtitle) {
@@ -84,12 +106,23 @@ function pdfTable(doc, headers, rows, colWidths) {
   doc.y = y + 10;
 }
 
-function buildProgressPDF(res, data, scopeLabel) {
+function pdfAISummary(doc, aiSummary) {
+  if (!aiSummary) return;
+  doc.fontSize(9).fillColor('#666').font('Helvetica-Oblique').text('AI Executive Summary', { continued: false });
+  doc.moveDown(0.2);
+  doc.fontSize(10).fillColor('#222').font('Helvetica').text(aiSummary, { width: 515, lineGap: 2 });
+  doc.moveDown(0.8);
+  doc.strokeColor('#ddd').lineWidth(0.5).moveTo(40, doc.y).lineTo(555, doc.y).stroke();
+  doc.moveDown(0.8);
+}
+
+function buildProgressPDF(res, data, scopeLabel, aiSummary) {
   const doc = new PDFDocument({ margin: 40, size: 'A4' });
   res.setHeader('Content-Type', 'application/pdf');
   res.setHeader('Content-Disposition', 'attachment; filename="progress-report.pdf"');
   doc.pipe(res);
   pdfHeader(doc, 'Progress Report', scopeLabel + ' — ' + new Date().toLocaleDateString('en-GB'));
+  pdfAISummary(doc, aiSummary);
 
   doc.fontSize(11).fillColor('#111').text(`Projects: ${data.P.length}   |   Avg Progress: ${data.P.length ? Math.round(data.P.reduce((a, p) => a + p.pct, 0) / data.P.length) : 0}%   |   Overdue Tasks: ${data.overdueTasks.length}`);
   doc.moveDown(1);
@@ -108,12 +141,13 @@ function buildProgressPDF(res, data, scopeLabel) {
   doc.end();
 }
 
-function buildFinancialPDF(res, data, scopeLabel) {
+function buildFinancialPDF(res, data, scopeLabel, aiSummary) {
   const doc = new PDFDocument({ margin: 40, size: 'A4' });
   res.setHeader('Content-Type', 'application/pdf');
   res.setHeader('Content-Disposition', 'attachment; filename="financial-report.pdf"');
   doc.pipe(res);
   pdfHeader(doc, 'Financial Report', scopeLabel + ' — ' + new Date().toLocaleDateString('en-GB'));
+  pdfAISummary(doc, aiSummary);
 
   const totalBudget = data.P.reduce((a, p) => a + (+p.budget || 0), 0);
   const totalSpent = data.P.reduce((a, p) => a + (+p.spent || 0), 0);
@@ -134,12 +168,13 @@ function buildFinancialPDF(res, data, scopeLabel) {
   doc.end();
 }
 
-function buildRiskPDF(res, data, scopeLabel) {
+function buildRiskPDF(res, data, scopeLabel, aiSummary) {
   const doc = new PDFDocument({ margin: 40, size: 'A4' });
   res.setHeader('Content-Type', 'application/pdf');
   res.setHeader('Content-Disposition', 'attachment; filename="risk-report.pdf"');
   doc.pipe(res);
   pdfHeader(doc, 'Risk Report', scopeLabel + ' — ' + new Date().toLocaleDateString('en-GB'));
+  pdfAISummary(doc, aiSummary);
 
   doc.fontSize(11).fillColor('#111').text(`At-Risk / Delayed Projects: ${data.atRiskProjects.length}   |   Overdue Tasks: ${data.overdueTasks.length}   |   Delayed Milestones: ${data.delayedMs.length}`);
   doc.moveDown(1);
@@ -284,7 +319,8 @@ router.get('/:type/:format', authMiddleware, async (req, res) => {
     const scopeLabel = project ? `Project: ${project}` : 'All Projects';
 
     if (format === 'pdf') {
-      PDF_BUILDERS[type](res, data, scopeLabel);
+      const aiSummary = await getAISummary(type, data, scopeLabel);
+      PDF_BUILDERS[type](res, data, scopeLabel, aiSummary);
     } else {
       await EXCEL_BUILDERS[type](res, data);
     }
