@@ -102,11 +102,19 @@ app.use('/api/change-orders', require('./routes/change_orders'));
 // Task Dependencies + Critical Path Method (CPM) scheduling
 app.use('/api/dependencies', require('./routes/dependencies'));
 
+// Punch List / Snag List — handover-phase defect tracking
+app.use('/api/punchlist', require('./routes/punchlist'));
+
 // SPA fallback — MUST be registered after every /api/* route above,
 // otherwise it intercepts API requests and returns the HTML page instead of JSON.
 app.get('*', (req, res) => {
   res.sendFile(path.join(__dirname, 'public', 'index.html'));
 });
+
+// Weekly PDF snapshot — every Saturday at 8am, saves updated progress/
+// financial/risk PDFs for every project to a local folder on disk.
+// Shared with routes/reports.js so it can also be triggered manually.
+const { generateWeeklyPDFSnapshots } = require('./lib/weeklySnapshot');
 
 // Weekly auto-report scheduler (runs every Sunday at 8am)
 async function runWeeklyReport() {
@@ -127,11 +135,14 @@ async function runWeeklyReport() {
   } catch (e) { console.error('Weekly report failed:', e.message); }
 }
 
-// Check if it's Sunday 8am every hour
+// Check if it's Sunday 8am (email report) or Saturday 8am (PDF snapshots) every hour
 setInterval(() => {
   const now = new Date();
   if (now.getDay() === 0 && now.getHours() === 8 && now.getMinutes() < 5) {
     runWeeklyReport();
+  }
+  if (now.getDay() === 6 && now.getHours() === 8 && now.getMinutes() < 5) {
+    generateWeeklyPDFSnapshots();
   }
   // Also run alert check every hour
   require('node-fetch')(`http://localhost:${process.env.PORT || 3000}/api/kpi/check-alerts`, {

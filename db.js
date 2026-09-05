@@ -330,9 +330,50 @@ async function initDB() {
         updated_at TIMESTAMPTZ DEFAULT NOW()
       );
 
+      -- PUNCH LIST / SNAG LIST — handover-phase defect tracking
+      CREATE TABLE IF NOT EXISTS punch_list_items (
+        id SERIAL PRIMARY KEY,
+        project_id VARCHAR(20) REFERENCES projects(id) ON DELETE CASCADE,
+        item_no INTEGER,
+        location VARCHAR(200),
+        description TEXT NOT NULL,
+        discipline VARCHAR(50),
+        severity VARCHAR(20) DEFAULT 'minor'
+          CHECK (severity IN ('critical','major','minor')),
+        responsible VARCHAR(150),
+        status VARCHAR(20) DEFAULT 'open'
+          CHECK (status IN ('open','in_progress','closed','verified')),
+        raised_date DATE DEFAULT CURRENT_DATE,
+        target_date DATE,
+        closed_date DATE,
+        verified_by VARCHAR(150),
+        notes TEXT,
+        created_by INTEGER REFERENCES users(id),
+        created_at TIMESTAMPTZ DEFAULT NOW(),
+        updated_at TIMESTAMPTZ DEFAULT NOW()
+      );
+
+      -- DOCUMENT SIGNATURES — CFR 21 Part 11 style e-signatures for
+      -- validation documents (IQ/OQ/PQ). Signing requires password
+      -- re-authentication (enforced in the route, not here) and creates
+      -- an immutable audit-trail record tied to the document.
+      CREATE TABLE IF NOT EXISTS document_signatures (
+        id SERIAL PRIMARY KEY,
+        document_id INTEGER REFERENCES project_documents(id) ON DELETE CASCADE,
+        user_id INTEGER REFERENCES users(id),
+        signer_name VARCHAR(150) NOT NULL,
+        signer_role VARCHAR(20) NOT NULL,
+        meaning VARCHAR(20) NOT NULL
+          CHECK (meaning IN ('authored','reviewed','approved')),
+        statement TEXT NOT NULL,
+        signed_at TIMESTAMPTZ DEFAULT NOW()
+      );
+
       -- INDEXES
       CREATE INDEX IF NOT EXISTS idx_risks_project ON risk_register(project_id);
       CREATE INDEX IF NOT EXISTS idx_co_project ON change_orders(project_id);
+      CREATE INDEX IF NOT EXISTS idx_punchlist_project ON punch_list_items(project_id);
+      CREATE INDEX IF NOT EXISTS idx_signatures_document ON document_signatures(document_id);
       CREATE INDEX IF NOT EXISTS idx_issues_project ON project_issues(project_id);
       CREATE INDEX IF NOT EXISTS idx_commissioning_project ON commissioning_items(project_id);
       CREATE INDEX IF NOT EXISTS idx_documents_project ON project_documents(project_id);

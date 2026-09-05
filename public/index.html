@@ -63,6 +63,7 @@
           <div class="ni" onclick="goto('issues')"><i class="ti ti-alert-triangle"></i><span class="nlbl">Issues Log</span></div>
           <div class="ni" onclick="goto('risks')"><i class="ti ti-shield-exclamation"></i><span class="nlbl">سجل المخاطر</span></div>
           <div class="ni" onclick="goto('changeorders')"><i class="ti ti-git-pull-request"></i><span class="nlbl">إدارة التغييرات</span></div>
+          <div class="ni" onclick="goto('punchlist')"><i class="ti ti-clipboard-check"></i><span class="nlbl">Punch List</span></div>
         </div>
         <div class="sbgrp"><div class="sbgrp-lbl">التقارير</div>
           <div class="ni" onclick="goto('kpi-overview')"><i class="ti ti-chart-arrows-vertical"></i><span class="nlbl">KPI Center</span></div>
@@ -116,7 +117,7 @@
         <div id="sr-content"><div class="loading"><i class="ti ti-loader-2"></i></div></div>
       </div>
       <div class="page" id="page-kpi-overview">
-        <div class="phd"><div class="phd-l"><div class="phd-t">KPI Center</div><div class="phd-s">مؤشرات الاداء الرئيسية - تحديث تلقائي كل 30 ثانية</div></div><div class="hacts"><select class="fsel" id="rep-type"><option value="progress">تقرير التقدم</option><option value="financial">تقرير مالي</option><option value="risk">تقرير المخاطر</option></select><button class="tbtn" onclick="downloadReport('pdf')"><i class="ti ti-file-type-pdf"></i>PDF</button><button class="tbtn" onclick="downloadReport('xlsx')"><i class="ti ti-file-type-xls"></i>Excel</button><button class="tbtn" onclick="loadKPI()"><i class="ti ti-refresh"></i>تحديث</button><button class="tbtn pri" onclick="goto('kpi-alerts')"><i class="ti ti-bell-ringing"></i>التنبيهات</button></div></div>
+        <div class="phd"><div class="phd-l"><div class="phd-t">KPI Center</div><div class="phd-s">مؤشرات الاداء الرئيسية - تحديث تلقائي كل 30 ثانية</div></div><div class="hacts"><select class="fsel" id="rep-type"><option value="progress">تقرير التقدم</option><option value="financial">تقرير مالي</option><option value="risk">تقرير المخاطر</option></select><button class="tbtn" onclick="downloadReport('pdf')"><i class="ti ti-file-type-pdf"></i>PDF</button><button class="tbtn" onclick="downloadReport('xlsx')"><i class="ti ti-file-type-xls"></i>Excel</button><button class="tbtn" onclick="runWeeklySnapshot()"><i class="ti ti-calendar-time"></i>تشغيل التحديث الأسبوعي الآن</button><button class="tbtn" onclick="loadKPI()"><i class="ti ti-refresh"></i>تحديث</button><button class="tbtn pri" onclick="goto('kpi-alerts')"><i class="ti ti-bell-ringing"></i>التنبيهات</button></div></div>
         <div id="kpi-center-content"><div class="loading"><i class="ti ti-loader-2"></i>جاري تحليل البيانات...</div></div>
       </div>
       <div class="page" id="page-kpi-alerts">
@@ -174,6 +175,14 @@
         </div></div>
         <div id="co-summary" style="margin-bottom:14px"></div>
         <div id="co-content"><div class="empty">اختر مشروع من القائمة</div></div>
+      </div>
+      <div class="page" id="page-punchlist">
+        <div class="phd"><div class="phd-l"><div class="phd-t">Punch List</div><div class="phd-s">ملاحظات مرحلة التسليم — قبل الاستلام النهائي</div></div><div class="hacts">
+          <select class="fsel" id="pl-pf" onchange="renderPunchList()"><option value="">اختر مشروع</option></select>
+          <button class="tbtn pri" onclick="addPunchItem()"><i class="ti ti-plus"></i>ملاحظة جديدة</button>
+        </div></div>
+        <div id="pl-summary" style="margin-bottom:14px"></div>
+        <div id="pl-content"><div class="empty">اختر مشروع من القائمة</div></div>
       </div>
       <div class="page" id="page-log"><div class="phd"><div class="phd-l"><div class="phd-t">سجل النشاط</div><div class="phd-s">مسجل على الخادم - مشترك بين الكل</div></div><div class="hacts"><select class="fsel" id="log-f" onchange="renderLog()"><option value="">كل الانشطة</option><option value="task">المهام</option><option value="project">المشاريع</option><option value="user">المستخدمين</option><option value="auth">الدخول</option><option value="reports">التقارير</option></select><button class="tbtn" onclick="renderLog()"><i class="ti ti-refresh"></i></button></div></div><div class="panel"><div id="log-list"><div class="loading"><i class="ti ti-loader-2"></i></div></div></div></div>
       <div class="page" id="page-settings"><div class="phd"><div class="phd-l"><div class="phd-t">الاعدادات</div><div class="phd-s">اعدادات النظام والمستخدمين</div></div></div><div class="stgrid"><div class="stnav"><div class="stni active" onclick="switchST('company',this)"><i class="ti ti-building"></i>الشركة</div><div class="stni" id="stn-users" onclick="switchST('users',this)"><i class="ti ti-users"></i>المستخدمون</div><div class="stni" onclick="switchST('appearance',this)"><i class="ti ti-palette"></i>المظهر</div><div class="stni" onclick="switchST('roles',this)"><i class="ti ti-shield"></i>الصلاحيات</div><div class="stni" onclick="switchST('integrations',this)"><i class="ti ti-plug"></i>التكاملات</div></div><div class="stcon"><div class="stsec active" id="ss-company"><div class="sttitle">بيانات الشركة</div><div class="stsub">تظهر في التقارير</div><div class="fg"><label>اسم الشركة</label><input type="text" class="fi" value="Atech Automation Technology"></div><button class="btn-s" onclick="toast('تم الحفظ','ok')">حفظ</button></div><div class="stsec" id="ss-users"><div class="sttitle">المستخدمون</div><div class="stsub">اضافة وحذف حسابات الفريق</div><button class="tbtn pri" style="margin-bottom:14px" onclick="document.getElementById('aum').classList.add('open')"><i class="ti ti-user-plus"></i>اضافة مستخدم</button><table class="stbl" id="users-tbl"></table></div><div class="stsec" id="ss-appearance"><div class="sttitle">المظهر</div><div class="fg" style="margin-top:12px"><label>لون التمييز</label><div id="cswatches" style="display:flex;gap:8px;flex-wrap:wrap;margin-top:6px"></div></div></div><div class="stsec" id="ss-roles"><div class="sttitle">مستويات الصلاحية</div><div id="roles-list"></div></div><div class="stsec" id="ss-integrations">

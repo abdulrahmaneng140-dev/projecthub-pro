@@ -259,4 +259,51 @@ router.post('/:project/import-excel', authMiddleware, requireRole('admin', 'pm',
   } catch (e) { res.status(400).json({ error: 'فشل قراءة ملف Excel: ' + e.message }); }
 });
 
+// ══════════════════════════════════════════════════════════════
+// E-SIGNATURES — CFR 21 Part 11 style signing for validation documents
+// (IQ/OQ/PQ). Signing requires re-entering the password (not just a
+// click) and creates an immutable audit-trail record.
+// ══════════════════════════════════════════════════════════════
+const bcrypt = require('bcryptjs');
+
+// GET /api/documents/item/:id/signatures — full signature history for a document
+router.get('/item/:id/signatures', authMiddleware, async (req, res) => {
+  try {
+    const { rows } = await pool.query('SELECT * FROM document_signatures WHERE document_id=$1 ORDER BY signed_at', [req.params.id]);
+    res.json(rows);
+  } catch (e) { res.status(500).json({ error: e.message }); }
+});
+
+// POST /api/documents/item/:id/sign  { meaning: 'authored'|'reviewed'|'approved', password }
+router.post('/item/:id/sign', authMiddleware, async (req, res) => {
+  const { meaning, password } = req.body;
+  if (!['authored', 'reviewed', 'approved'].includes(meaning)) return res.status(400).json({ error: 'نوع توقيع غير صالح' });
+  if (!password) return res.status(400).json({ error: 'أدخل كلمة المرور للتوقيع — ده متطلب امتثال (CFR 21 Part 11)' });
+  try {
+    const { rows: docRows } = await pool.query('SELECT * FROM project_documents WHERE id=$1', [req.params.id]);
+    if (!docRows.length) return res.status(404).json({ error: 'المستند غير موجود' });
+
+    const { rows: userRows } = await pool.query('SELECT * FROM users WHERE id=$1', [req.user.id]);
+    const user = userRows[0];
+    const valid = await bcrypt.compare(password, user.password_hash);
+    if (!valid) return res.status(401).json({ error: 'كلمة المرور غير صحيحة — التوقيع تم إلغاؤه' });
+
+    const MEANING_TEXT = { authored: 'قام بإعداد هذا المستند', reviewed: 'راجع هذا المستند', approved: 'اعتمد هذا المستند' };
+    const statement = `${user.full_name} (${user.role}) ${MEANING_TEXT[meaning]} بتاريخ ${new Date().toLocaleString('en-GB')}`;
+
+    const { rows } = await pool.query(
+      `INSERT INTO document_signatures (document_id, user_id, signer_name, signer_role, meaning, statement)
+       VALUES ($1,$2,$3,$4,$5,$6) RETURNING *`,
+      [req.params.id, user.id, user.full_name, user.role, meaning, statement]
+    );
+
+    await pool.query(
+      'INSERT INTO activity_log (type,message,icon,color,user_id,user_name) VALUES ($1,$2,$3,$4,$5,$6)',
+      ['documents', `توقيع إلكتروني (${meaning}) على مستند: ${docRows[0].name}`, 'ti-signature', '#9b72f4', user.id, user.full_name]
+    );
+
+    res.status(201).json(rows[0]);
+  } catch (e) { res.status(500).json({ error: e.message }); }
+});
+
 module.exports = { router, runDocumentCheck, applyDocumentTemplate };

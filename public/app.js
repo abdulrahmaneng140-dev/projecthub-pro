@@ -56,7 +56,7 @@ const hc=s=>s>=80?'#22c87a':s>=60?'#f0a030':'#f05a5a';
 const hl=s=>s>=80?'ممتاز':s>=60?'متوسط':'ضعيف';
 
 function initSels(){
-  [['ft-proj','proj'],['kb-pf','proj'],['g-pf','proj'],['tl-pf','proj'],['sr-pf','proj'],['doc-pf','proj'],['cm-pf','proj'],['is-pf','proj'],['rk-pf','proj'],['co-pf','proj'],['cpm-pf','proj'],
+  [['ft-proj','proj'],['kb-pf','proj'],['g-pf','proj'],['tl-pf','proj'],['sr-pf','proj'],['doc-pf','proj'],['cm-pf','proj'],['is-pf','proj'],['rk-pf','proj'],['co-pf','proj'],['cpm-pf','proj'],['pl-pf','proj'],
    ['fp-lead','team'],['ft-assign','team'],['kb-af','team'],['ms-proj','proj']].forEach(([id,type])=>{
     const s=document.getElementById(id);if(!s)return;
     const v=s.value;
@@ -135,7 +135,7 @@ async function refreshData(){
 setInterval(refreshData,30000);
 
 // ══ NAV ══
-const PT={dashboard:['لوحة التحكم','نظرة عامة'],projects:['المشاريع','إدارة المشاريع'],kanban:['Kanban Board','تتبع المهام'],gantt:['Gantt Chart','الجدول الزمني'],timeline:['Timeline','الخط الزمني'],team:['الفريق','أعضاء الفريق'],sitereport:['Site Report اليومي','تقارير الأداء'],log:['سجل النشاط','مسجل على الخادم'],settings:['الإعدادات','إعدادات النظام'],documents:['تتبع المستندات','المستندات الناقصة والمتأخرة'],portfolio:['Portfolio','إدارة المشاريع المتعددة'],commissioning:['مصفوفة الإنجاز','تدقيق تفصيلي لكل لوحة عبر مراحل الإنجاز'],issues:['Issues Log','تتبع مشاكل الموقع والتشغيل'],risks:['سجل المخاطر','مخاطر محتملة — احتمالية × تأثير'],changeorders:['إدارة التغييرات','طلبات تغيير النطاق/التكلفة/الجدول الزمني'],cpm:['الجدولة الزمنية (CPM)','المسار الحرج بناءً على علاقات المهام']};
+const PT={dashboard:['لوحة التحكم','نظرة عامة'],projects:['المشاريع','إدارة المشاريع'],kanban:['Kanban Board','تتبع المهام'],gantt:['Gantt Chart','الجدول الزمني'],timeline:['Timeline','الخط الزمني'],team:['الفريق','أعضاء الفريق'],sitereport:['Site Report اليومي','تقارير الأداء'],log:['سجل النشاط','مسجل على الخادم'],settings:['الإعدادات','إعدادات النظام'],documents:['تتبع المستندات','المستندات الناقصة والمتأخرة'],portfolio:['Portfolio','إدارة المشاريع المتعددة'],commissioning:['مصفوفة الإنجاز','تدقيق تفصيلي لكل لوحة عبر مراحل الإنجاز'],issues:['Issues Log','تتبع مشاكل الموقع والتشغيل'],risks:['سجل المخاطر','مخاطر محتملة — احتمالية × تأثير'],changeorders:['إدارة التغييرات','طلبات تغيير النطاق/التكلفة/الجدول الزمني'],cpm:['الجدولة الزمنية (CPM)','المسار الحرج بناءً على علاقات المهام'],punchlist:['Punch List','ملاحظات مرحلة التسليم']};
 async function goto(pg){
   if(pg==='team'&&!can('view_team')){toast('ليس لديك صلاحية','err');return;}
   if(pg==='settings'&&!can('settings')){toast('ليس لديك صلاحية','err');return;}
@@ -162,6 +162,7 @@ async function goto(pg){
   else if(pg==='risks')renderRisks();
   else if(pg==='changeorders')renderChangeOrders();
   else if(pg==='cpm')renderCPM();
+  else if(pg==='punchlist')renderPunchList();
 }
 function toggleSB(){sbMini=!sbMini;document.getElementById('sb').classList.toggle('mini',sbMini);document.getElementById('sb-ic').className=sbMini?'ti ti-layout-sidebar-left-expand':'ti ti-layout-sidebar-right-collapse';}
 
@@ -629,7 +630,7 @@ async function renderDocuments(){
     summaryEl.innerHTML=Object.entries(DOC_STATUS).map(([k,v])=>
       `<span class="pill" style="background:${v.c}18;color:${v.c};border:1px solid ${v.c}33;margin-left:6px">${v.l}: ${byStatus[k]||0}</span>`
     ).join('');
-    contentEl.innerHTML=docs.length?('<table class="stbl"><tr><th>المستند</th><th>الفئة</th><th>الحالة</th><th>موعد الاستحقاق</th><th>ملف</th><th></th></tr>'+
+    contentEl.innerHTML=docs.length?('<table class="stbl"><tr><th>المستند</th><th>الفئة</th><th>الحالة</th><th>موعد الاستحقاق</th><th>ملف</th><th>توقيع</th><th></th></tr>'+
       docs.map(d=>`<tr>
         <td>${d.name}</td><td>${d.category}</td>
         <td><select class="fsel" style="font-size:11px" onchange="updateDocStatus(${d.id},this.value)">
@@ -637,6 +638,7 @@ async function renderDocuments(){
         </select></td>
         <td>${d.due_date||'-'}</td>
         <td>${d.file_url?`<a href="${d.file_url}" target="_blank"><i class="ti ti-external-link"></i></a>`:`<button class="tbtn" style="font-size:11px" onclick="attachDocLink(${d.id})">إرفاق رابط</button>`}</td>
+        <td><button class="tbtn" style="font-size:11px" onclick="openSignModal(${d.id},'${(d.name||'').replace(/'/g,"\\'")}')"><i class="ti ti-signature"></i>توقيع</button> <button class="tbtn" style="font-size:11px" onclick="viewSignatures(${d.id})"><i class="ti ti-history"></i></button></td>
         <td><button class="tbtn" onclick="deleteDocRequirement(${d.id})"><i class="ti ti-trash"></i></button></td>
       </tr>`).join('')+'</table>')
       :'<div class="empty">لا توجد مستندات مطلوبة لهذا المشروع بعد — طبّق قالب أو أضف مستند جديد</div>';
@@ -675,6 +677,76 @@ async function runDocCheck(){
   try{
     const r=await API.post('/documents/check/run');
     toast(`تم الفحص: ${r.added} تنبيه جديد من ${r.checked} مستند ناقص`,'ok');
+  }catch(e){toast(e.message,'err');}
+}
+
+// ══ PUNCH LIST ══
+const PL_SEV={critical:{l:'حرجة',c:'#f05a5a'},major:{l:'رئيسية',c:'#f0a030'},minor:{l:'بسيطة',c:'#5c657e'}};
+const PL_STATUS={open:{l:'مفتوحة',c:'#f05a5a'},in_progress:{l:'جارية',c:'#f0a030'},closed:{l:'مغلقة',c:'#4f8ef7'},verified:{l:'موثّقة',c:'#22c87a'}};
+
+async function renderPunchList(){
+  initSels();
+  const proj=document.getElementById('pl-pf')?.value;
+  const summaryEl=document.getElementById('pl-summary'),contentEl=document.getElementById('pl-content');
+  if(!proj){contentEl.innerHTML='<div class="empty">اختر مشروع من القائمة</div>';summaryEl.innerHTML='';return;}
+  contentEl.innerHTML='<div class="loading"><i class="ti ti-loader-2"></i></div>';
+  try{
+    const items=await API.get('/punchlist/'+proj);
+    const open=items.filter(i=>i.status==='open'||i.status==='in_progress').length;
+    const critical=items.filter(i=>i.severity==='critical'&&(i.status==='open'||i.status==='in_progress')).length;
+    summaryEl.innerHTML=`<span class="pill" style="background:#f05a5a18;color:#f05a5a;margin-left:6px">حرجة مفتوحة: ${critical}</span><span class="pill" style="background:#f0a03018;color:#f0a030;margin-left:6px">مفتوحة: ${open}</span><span class="pill" style="background:var(--bg3);color:var(--t3)">إجمالي: ${items.length}</span>`;
+    contentEl.innerHTML=items.length?(`<table class="stbl"><tr><th>#</th><th>الموقع</th><th>الوصف</th><th>التخصص</th><th>الخطورة</th><th>المسؤول</th><th>الحالة</th><th></th></tr>
+      ${items.map(i=>`<tr style="${i.severity==='critical'&&i.status!=='verified'?'background:#f05a5a0d':''}">
+        <td>${i.item_no||'-'}</td><td>${i.location||'-'}</td>
+        <td style="max-width:240px;white-space:normal">${i.description}</td>
+        <td>${i.discipline||'-'}</td>
+        <td><span class="pill" style="background:${PL_SEV[i.severity].c}18;color:${PL_SEV[i.severity].c}">${PL_SEV[i.severity].l}</span></td>
+        <td>${i.responsible||'-'}</td>
+        <td><select class="fsel" style="font-size:11px;color:${PL_STATUS[i.status].c}" onchange="updatePunchStatus(${i.id},this.value)">
+          ${Object.entries(PL_STATUS).map(([k,v])=>`<option value="${k}" ${i.status===k?'selected':''}>${v.l}</option>`).join('')}
+        </select></td>
+        <td><button class="tbtn" onclick="deletePunchItem(${i.id})"><i class="ti ti-trash"></i></button></td>
+      </tr>`).join('')}</table>`)
+      :'<div class="empty">لا توجد ملاحظات تسليم لهذا المشروع بعد 🎉</div>';
+  }catch(e){contentEl.innerHTML='<div class="empty">فشل تحميل البيانات</div>';}
+}
+async function updatePunchStatus(id,status){
+  try{await API.put('/punchlist/item/'+id,{status});toast('تم التحديث','ok');renderPunchList();}catch(e){toast(e.message,'err');}
+}
+async function deletePunchItem(id){
+  if(!confirm('حذف هذه الملاحظة؟'))return;
+  try{await API.del('/punchlist/item/'+id);renderPunchList();}catch(e){toast(e.message,'err');}
+}
+async function addPunchItem(){
+  const proj=document.getElementById('pl-pf')?.value;
+  if(!proj){toast('اختر مشروع أولاً','err');return;}
+  const description=prompt('وصف الملاحظة:');if(!description)return;
+  const location=prompt('الموقع (اختياري، مثال: Panel Room 2):','');
+  const discipline=prompt('التخصص (اختياري، مثال: BMS/Electrical/Civil):','');
+  const severity=prompt('الخطورة: critical / major / minor','minor');
+  const responsible=prompt('المسؤول (اختياري):','');
+  try{await API.post('/punchlist/'+proj,{description,location,discipline,severity:(severity||'minor').trim(),responsible});renderPunchList();}
+  catch(e){toast(e.message,'err');}
+}
+
+// ══ E-SIGNATURES (CFR 21 Part 11) ══
+async function openSignModal(docId,docName){
+  const meaningInput=prompt(`توقيع إلكتروني على: "${docName}"\n\nنوع التوقيع:\n1) authored — إعداد\n2) reviewed — مراجعة\n3) approved — اعتماد\n\nاكتب: authored أو reviewed أو approved`);
+  if(!meaningInput)return;
+  const meaning=meaningInput.trim().toLowerCase();
+  if(!['authored','reviewed','approved'].includes(meaning)){toast('نوع توقيع غير صالح','err');return;}
+  const password=prompt('أدخل كلمة المرور بتاعتك لتأكيد التوقيع (متطلب امتثال CFR 21 Part 11):');
+  if(!password)return;
+  try{
+    await API.post('/documents/item/'+docId+'/sign',{meaning,password});
+    toast('تم التوقيع بنجاح ✅','ok');
+  }catch(e){toast(e.message,'err');}
+}
+async function viewSignatures(docId){
+  try{
+    const sigs=await API.get('/documents/item/'+docId+'/signatures');
+    if(!sigs.length){alert('لا يوجد توقيعات على هذا المستند بعد');return;}
+    alert(sigs.map(s=>`• ${s.statement}`).join('\n\n'));
   }catch(e){toast(e.message,'err');}
 }
 
@@ -832,6 +904,14 @@ async function importDocsExcel(input,sheetType){
     renderDocuments();
   }catch(e){toast(e.message||'فشل استيراد الملف','err');}
   input.value='';
+}
+
+async function runWeeklySnapshot(){
+  toast('جاري توليد الملفات... ممكن ياخد شوية ثواني','info');
+  try{
+    const data=await API.post('/reports/weekly-snapshot/run',{});
+    toast(`تم حفظ ${data.saved} ملف PDF في مجلد weekly-reports`,'ok');
+  }catch(e){toast(e.message||'فشل التوليد','err');}
 }
 
 async function downloadReport(format){

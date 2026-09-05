@@ -334,4 +334,13 @@ router.get('/:type/:format', authMiddleware, async (req, res) => {
   }
 });
 
+// POST /api/reports/weekly-snapshot/run — manual trigger (also runs automatically every Saturday 8am)
+router.post('/weekly-snapshot/run', authMiddleware, async (req, res) => {
+  try {
+    const { generateWeeklyPDFSnapshots } = require('../lib/weeklySnapshot');
+    const result = await generateWeeklyPDFSnapshots();
+    res.json({ success: true, saved: result.saved, dir: result.dir });
+  } catch (e) { res.status(500).json({ error: e.message }); }
+});
+
 module.exports = router;
