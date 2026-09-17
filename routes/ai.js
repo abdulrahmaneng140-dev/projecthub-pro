@@ -6,7 +6,7 @@ const { askClaude } = require('../lib/claude');
 // ── POST /api/ai — project chat assistant (unchanged behavior, moved from server.js) ──
 router.post('/', authMiddleware, async (req, res) => {
   const { question, context } = req.body;
-  if (!process.env.ANTHROPIC_API_KEY) return res.status(503).json({ error: 'ANTHROPIC_API_KEY غير مضاف في إعدادات الخادم' });
+  if (!process.env.ANTHROPIC_API_KEY && !process.env.OLLAMA_MODEL) return res.status(503).json({ error: 'مفيش AI مضاف — ضيفي ANTHROPIC_API_KEY أو OLLAMA_MODEL في .env' });
   try {
     const system = `أنت مساعد ذكي لإدارة المشاريع الهندسية — Atech Automation. تتحدث بالعربية المصرية بإيجاز وعملية.\nالمشاريع:\n${context?.projects}\n${context?.tasks}\nالمستخدم: ${context?.user} (${context?.role})\nأجب في 2-4 جمل.`;
     const answer = await askClaude(system, question, 800);
@@ -20,7 +20,7 @@ router.post('/', authMiddleware, async (req, res) => {
 // risk analysis. Optional project_id scopes to one project.
 // ══════════════════════════════════════════════════════════════
 router.post('/risk-analysis', authMiddleware, async (req, res) => {
-  if (!process.env.ANTHROPIC_API_KEY) return res.status(503).json({ error: 'ANTHROPIC_API_KEY غير مضاف في إعدادات الخادم' });
+  if (!process.env.ANTHROPIC_API_KEY && !process.env.OLLAMA_MODEL) return res.status(503).json({ error: 'مفيش AI مضاف — ضيفي ANTHROPIC_API_KEY أو OLLAMA_MODEL في .env' });
   const { project_id } = req.body;
   try {
     const args = project_id ? [project_id] : [];

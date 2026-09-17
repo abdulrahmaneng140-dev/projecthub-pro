@@ -105,6 +105,9 @@ app.use('/api/dependencies', require('./routes/dependencies'));
 // Punch List / Snag List — handover-phase defect tracking
 app.use('/api/punchlist', require('./routes/punchlist'));
 
+// Database backups — daily automatic + manual trigger
+app.use('/api/backup', require('./routes/backup'));
+
 // SPA fallback — MUST be registered after every /api/* route above,
 // otherwise it intercepts API requests and returns the HTML page instead of JSON.
 app.get('*', (req, res) => {
@@ -115,6 +118,7 @@ app.get('*', (req, res) => {
 // financial/risk PDFs for every project to a local folder on disk.
 // Shared with routes/reports.js so it can also be triggered manually.
 const { generateWeeklyPDFSnapshots } = require('./lib/weeklySnapshot');
+const { runBackup } = require('./lib/backup');
 
 // Weekly auto-report scheduler (runs every Sunday at 8am)
 async function runWeeklyReport() {
@@ -143,6 +147,10 @@ setInterval(() => {
   }
   if (now.getDay() === 6 && now.getHours() === 8 && now.getMinutes() < 5) {
     generateWeeklyPDFSnapshots();
+  }
+  // Database backup — every day at 2am
+  if (now.getHours() === 2 && now.getMinutes() < 5) {
+    runBackup().then(f => console.log('✅ DB backup saved:', f)).catch(e => console.error('Backup failed:', e.message));
   }
   // Also run alert check every hour
   require('node-fetch')(`http://localhost:${process.env.PORT || 3000}/api/kpi/check-alerts`, {

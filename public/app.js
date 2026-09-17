@@ -412,7 +412,26 @@ async function renderIntegrations(){
     else if(s.connected){el.textContent='متصل: '+(s.account?.account_email||'');btn.textContent='إعادة الربط';btn.onclick=connectMicrosoft;}
     else{el.textContent='غير متصل';btn.disabled=false;}
   }catch(e){}
-  loadWebhooks();loadApiKeys();
+  loadWebhooks();loadApiKeys();loadBackups();
+}
+
+async function loadBackups(){
+  try{
+    const {backups}=await API.get('/backup/status');
+    const tbl=document.getElementById('backup-tbl');
+    if(!tbl)return;
+    tbl.innerHTML='<tr><th>الملف</th><th>الحجم</th><th>التاريخ</th></tr>'+
+      (backups.length?backups.map(b=>`<tr><td style="font-family:monospace;font-size:11px">${b.name}</td><td>${(b.size/1024).toFixed(0)} KB</td><td>${new Date(b.created).toLocaleString('ar')}</td></tr>`).join('')
+      :'<tr><td colspan="3" style="color:#888">لا توجد نسخ احتياطية بعد</td></tr>');
+  }catch(e){}
+}
+async function runBackupNow(){
+  toast('جاري عمل نسخة احتياطية...','info');
+  try{
+    const data=await API.post('/backup/run',{});
+    toast('تم حفظ نسخة احتياطية: '+data.file,'ok');
+    loadBackups();
+  }catch(e){toast(e.message||'فشلت النسخة الاحتياطية','err');}
 }
 
 function connectMicrosoft(){window.open(API.base+'/integrations/msgraph/connect?token='+API.token,'_blank');}
@@ -914,17 +933,26 @@ async function runWeeklySnapshot(){
   }catch(e){toast(e.message||'فشل التوليد','err');}
 }
 
+function toggleRepProjFilter(){
+  const type=document.getElementById('rep-type').value;
+  const sel=document.getElementById('rep-proj');
+  sel.style.display=type==='status'?'inline-block':'none';
+  if(type==='status'&&sel.options.length<=1)sel.innerHTML='<option value="">اختر مشروع</option>'+projects.map(p=>`<option value="${p.id}">${p.name}</option>`).join('');
+}
 async function downloadReport(format){
   const type=document.getElementById('rep-type').value;
+  const proj=document.getElementById('rep-proj')?.value;
+  if(type==='status'&&!proj){toast('اختاري مشروع أولاً لتقرير الحالة الشامل','err');return;}
   try{
-    const res=await fetch(API.base+'/reports/'+type+'/'+format,{headers:API.headers()});
+    const url=API.base+'/reports/'+type+'/'+format+(proj?'?project='+encodeURIComponent(proj):'');
+    const res=await fetch(url,{headers:API.headers()});
     if(!res.ok){const e=await res.json().catch(()=>({error:'فشل التصدير'}));throw new Error(e.error);}
     const blob=await res.blob();
-    const url=URL.createObjectURL(blob);
+    const dlUrl=URL.createObjectURL(blob);
     const a=document.createElement('a');
-    a.href=url;a.download=type+'-report.'+(format==='xlsx'?'xlsx':'pdf');
+    a.href=dlUrl;a.download=type+'-report.'+(format==='xlsx'?'xlsx':'pdf');
     document.body.appendChild(a);a.click();a.remove();
-    URL.revokeObjectURL(url);
+    URL.revokeObjectURL(dlUrl);
   }catch(e){alert(e.message||'فشل تحميل التقرير');}
 }
 

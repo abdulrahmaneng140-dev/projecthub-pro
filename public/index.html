@@ -117,7 +117,7 @@
         <div id="sr-content"><div class="loading"><i class="ti ti-loader-2"></i></div></div>
       </div>
       <div class="page" id="page-kpi-overview">
-        <div class="phd"><div class="phd-l"><div class="phd-t">KPI Center</div><div class="phd-s">مؤشرات الاداء الرئيسية - تحديث تلقائي كل 30 ثانية</div></div><div class="hacts"><select class="fsel" id="rep-type"><option value="progress">تقرير التقدم</option><option value="financial">تقرير مالي</option><option value="risk">تقرير المخاطر</option></select><button class="tbtn" onclick="downloadReport('pdf')"><i class="ti ti-file-type-pdf"></i>PDF</button><button class="tbtn" onclick="downloadReport('xlsx')"><i class="ti ti-file-type-xls"></i>Excel</button><button class="tbtn" onclick="runWeeklySnapshot()"><i class="ti ti-calendar-time"></i>تشغيل التحديث الأسبوعي الآن</button><button class="tbtn" onclick="loadKPI()"><i class="ti ti-refresh"></i>تحديث</button><button class="tbtn pri" onclick="goto('kpi-alerts')"><i class="ti ti-bell-ringing"></i>التنبيهات</button></div></div>
+        <div class="phd"><div class="phd-l"><div class="phd-t">KPI Center</div><div class="phd-s">مؤشرات الاداء الرئيسية - تحديث تلقائي كل 30 ثانية</div></div><div class="hacts"><select class="fsel" id="rep-type" onchange="toggleRepProjFilter()"><option value="progress">تقرير التقدم</option><option value="financial">تقرير مالي</option><option value="risk">تقرير المخاطر</option><option value="status">تقرير حالة شامل (مشروع واحد)</option></select><select class="fsel" id="rep-proj" style="display:none"><option value="">اختر مشروع</option></select><button class="tbtn" onclick="downloadReport('pdf')"><i class="ti ti-file-type-pdf"></i>PDF</button><button class="tbtn" onclick="downloadReport('xlsx')"><i class="ti ti-file-type-xls"></i>Excel</button><button class="tbtn" onclick="runWeeklySnapshot()"><i class="ti ti-calendar-time"></i>تشغيل التحديث الأسبوعي الآن</button><button class="tbtn" onclick="loadKPI()"><i class="ti ti-refresh"></i>تحديث</button><button class="tbtn pri" onclick="goto('kpi-alerts')"><i class="ti ti-bell-ringing"></i>التنبيهات</button></div></div>
         <div id="kpi-center-content"><div class="loading"><i class="ti ti-loader-2"></i>جاري تحليل البيانات...</div></div>
       </div>
       <div class="page" id="page-kpi-alerts">
@@ -201,6 +201,11 @@
   <div style="margin-top:16px;padding:16px;border:1px solid #2a2a2a;border-radius:10px">
     <strong>MS Project</strong>
     <div class="stsub">تصدير/استيراد ملفات XML متاح من صفحة Timeline لكل مشروع</div>
+  </div>
+  <div style="margin-top:16px;padding:16px;border:1px solid #2a2a2a;border-radius:10px">
+    <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:6px"><strong>نسخ احتياطي لقاعدة البيانات</strong><button class="tbtn pri" onclick="runBackupNow()"><i class="ti ti-database-export"></i>نسخة احتياطية الآن</button></div>
+    <div class="stsub" style="margin-bottom:10px">نسخة تلقائية كل يوم الساعة 2 صباحاً — بتتحفظ في مجلد backups جوا المشروع</div>
+    <table class="stbl" id="backup-tbl"></table>
   </div>
 </div></div></div></div>
     </div>

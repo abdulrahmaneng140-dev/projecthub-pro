@@ -44,6 +44,42 @@ async function getReportData(projectId) {
   return { P: withMetrics, T, MS, overdueTasks, delayedMs, atRiskProjects, overBudgetProjects, today };
 }
 
+// ══════════════════════════════════════════════════════════════
+// COMPREHENSIVE STATUS REPORT — pulls together progress, top risks,
+// critical issues, commissioning completion, punch list, and missing
+// documents for ONE project into a single stakeholder-ready PDF.
+// ══════════════════════════════════════════════════════════════
+const CPM_STAGE_COUNT = 19; // matches lib's commissioning stage template
+
+async function getStatusData(projectId) {
+  const base = await getReportData(projectId);
+  if (!projectId) return { ...base, risks: [], issues: [], commissioning: [], punchOpen: 0, punchTotal: 0, missingDocs: [] };
+
+  const [risksR, issuesR, commR, punchR, docsR] = await Promise.all([
+    pool.query(`SELECT * FROM risk_register WHERE project_id=$1 AND status='open' ORDER BY (probability*impact) DESC LIMIT 5`, [projectId]),
+    pool.query(`SELECT * FROM project_issues WHERE project_id=$1 AND status='Open' ORDER BY open_date LIMIT 8`, [projectId]),
+    pool.query(`SELECT * FROM commissioning_items WHERE project_id=$1`, [projectId]),
+    pool.query(`SELECT * FROM punch_list_items WHERE project_id=$1`, [projectId]),
+    pool.query(`SELECT * FROM project_documents WHERE project_id=$1 AND status='missing'`, [projectId]),
+  ]);
+
+  const commissioning = commR.rows.map(c => {
+    const done = Object.values(c.stages || {}).filter(v => v === 'done').length;
+    return { ...c, pct: Math.round(done / CPM_STAGE_COUNT * 100) };
+  });
+  const avgCommissioning = commissioning.length ? Math.round(commissioning.reduce((a, c) => a + c.pct, 0) / commissioning.length) : null;
+
+  return {
+    ...base,
+    risks: risksR.rows.map(r => ({ ...r, score: r.probability * r.impact })),
+    issues: issuesR.rows,
+    commissioning, avgCommissioning,
+    punchOpen: punchR.rows.filter(p => p.status === 'open' || p.status === 'in_progress').length,
+    punchTotal: punchR.rows.length,
+    missingDocs: docsR.rows,
+  };
+}
+
 const STATUS_LABEL = { 'on-track': 'On Track', 'at-risk': 'At Risk', 'delayed': 'Delayed', 'done': 'Done' };
 const fmtMoney = n => 'SAR ' + Number(n || 0).toLocaleString('en-US');
 
@@ -63,6 +99,9 @@ async function getAISummary(type, data, scopeLabel) {
     context = `Scope: ${scopeLabel}\nTotal budget: SAR ${totalBudget}\nTotal spent: SAR ${totalSpent}\nProjects near/over budget: ${data.overBudgetProjects.map(p => p.name).join(', ') || 'none'}`;
   } else if (type === 'risk') {
     context = `Scope: ${scopeLabel}\nAt-risk/delayed projects: ${data.atRiskProjects.map(p => p.name).join(', ') || 'none'}\nOverdue tasks: ${data.overdueTasks.length}\nDelayed milestones: ${data.delayedMs.length}`;
+  } else if (type === 'status') {
+    const p = data.P[0];
+    context = `Scope: ${scopeLabel}\nProgress: ${p ? p.pct : '-'}% (SPI ${p ? p.spi : '-'}, CPI ${p ? p.cpi : '-'})\nOpen risks: ${data.risks.length}${data.risks.length ? ' — top: ' + data.risks[0].description : ''}\nOpen issues: ${data.issues.length}\nCommissioning completion: ${data.avgCommissioning != null ? data.avgCommissioning + '%' : 'n/a'}\nPunch list: ${data.punchOpen} open of ${data.punchTotal}\nMissing documents: ${data.missingDocs.length}`;
   }
   const system = 'You write a short executive summary (3-4 sentences, English) for an engineering project report, in a direct professional tone suitable for senior management. Interpret the numbers rather than just repeating them.';
   return askClaude(system, context, 300);
@@ -199,7 +238,58 @@ function buildRiskPDF(res, data, scopeLabel, aiSummary) {
   doc.end();
 }
 
-const PDF_BUILDERS = { progress: buildProgressPDF, financial: buildFinancialPDF, risk: buildRiskPDF };
+function buildStatusPDF(res, data, scopeLabel, aiSummary) {
+  const doc = new PDFDocument({ margin: 40, size: 'A4' });
+  res.setHeader('Content-Type', 'application/pdf');
+  res.setHeader('Content-Disposition', 'attachment; filename="project-status-report.pdf"');
+  doc.pipe(res);
+  pdfHeader(doc, 'Project Status Report', scopeLabel + ' — ' + new Date().toLocaleDateString('en-GB'));
+  pdfAISummary(doc, aiSummary);
+
+  const p = data.P[0];
+  if (p) {
+    doc.fontSize(11).fillColor('#111').text(
+      `Progress: ${p.pct}%  |  Planned: ${p.planned}%  |  SPI: ${p.spi}  |  CPI: ${p.cpi}  |  Status: ${p.status}` +
+      (data.avgCommissioning != null ? `  |  Commissioning: ${data.avgCommissioning}%` : '')
+    );
+    doc.moveDown(1);
+  }
+
+  doc.fontSize(13).fillColor('#111').text('Top Open Risks');
+  doc.moveDown(0.3);
+  if (data.risks.length) {
+    pdfTable(doc, ['Risk', 'Category', 'P×I', 'Owner'],
+      data.risks.map(r => [r.description, r.category, r.probability + '×' + r.impact + '=' + r.score, r.owner || '-']),
+      [230, 90, 80, 115]);
+  } else {
+    doc.fontSize(10).fillColor('#2e7d32').text('No open risks recorded.');
+    doc.moveDown(0.8);
+  }
+
+  doc.fontSize(13).fillColor('#111').text('Critical Open Issues');
+  doc.moveDown(0.3);
+  if (data.issues.length) {
+    pdfTable(doc, ['Issue', 'Phase', 'Responsible', 'Open Since'],
+      data.issues.map(i => [i.issue, i.phase || '-', i.responsible || '-', i.open_date || '-']),
+      [255, 90, 95, 75]);
+  } else {
+    doc.fontSize(10).fillColor('#2e7d32').text('No open issues.');
+    doc.moveDown(0.8);
+  }
+
+  doc.fontSize(13).fillColor('#111').text('Handover Readiness');
+  doc.moveDown(0.3);
+  doc.fontSize(10).fillColor('#222').text(
+    `Punch List: ${data.punchOpen} open of ${data.punchTotal} total  |  Missing Documents: ${data.missingDocs.length}`
+  );
+  if (data.missingDocs.length) {
+    doc.moveDown(0.3);
+    doc.fontSize(9).fillColor('#666').text(data.missingDocs.map(d => d.name).join(', '), { width: 515 });
+  }
+  doc.end();
+}
+
+const PDF_BUILDERS = { progress: buildProgressPDF, financial: buildFinancialPDF, risk: buildRiskPDF, status: buildStatusPDF };
 
 // ══════════════════════════════════════════════════════════════
 // EXCEL BUILDERS
@@ -306,16 +396,18 @@ const EXCEL_BUILDERS = { progress: buildProgressExcel, financial: buildFinancial
 // ROUTES
 // ══════════════════════════════════════════════════════════════
 // GET /api/reports/:type/:format?project=PC003
-// type: progress | financial | risk      format: pdf | xlsx
+// type: progress | financial | risk | status      format: pdf | xlsx (status is PDF-only)
 router.get('/:type/:format', authMiddleware, async (req, res) => {
   const { type, format } = req.params;
   const { project } = req.query;
 
-  if (!PDF_BUILDERS[type]) return res.status(400).json({ error: 'نوع تقرير غير معروف — استخدم progress أو financial أو risk' });
+  if (!PDF_BUILDERS[type]) return res.status(400).json({ error: 'نوع تقرير غير معروف — استخدم progress أو financial أو risk أو status' });
   if (format !== 'pdf' && format !== 'xlsx') return res.status(400).json({ error: 'الصيغة يجب أن تكون pdf أو xlsx' });
+  if (type === 'status' && format === 'xlsx') return res.status(400).json({ error: 'تقرير حالة المشروع الشامل متاح بصيغة PDF فقط' });
+  if (type === 'status' && !project) return res.status(400).json({ error: 'تقرير حالة المشروع الشامل يحتاج مشروع محدد — أضيفي ?project=CODE' });
 
   try {
-    const data = await getReportData(project || null);
+    const data = type === 'status' ? await getStatusData(project) : await getReportData(project || null);
     const scopeLabel = project ? `Project: ${project}` : 'All Projects';
 
     if (format === 'pdf') {
