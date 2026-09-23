@@ -56,7 +56,7 @@ const hc=s=>s>=80?'#22c87a':s>=60?'#f0a030':'#f05a5a';
 const hl=s=>s>=80?'ممتاز':s>=60?'متوسط':'ضعيف';
 
 function initSels(){
-  [['ft-proj','proj'],['kb-pf','proj'],['g-pf','proj'],['tl-pf','proj'],['sr-pf','proj'],['doc-pf','proj'],['cm-pf','proj'],['is-pf','proj'],['rk-pf','proj'],['co-pf','proj'],['cpm-pf','proj'],['pl-pf','proj'],
+  [['ft-proj','proj'],['kb-pf','proj'],['g-pf','proj'],['tl-pf','proj'],['sr-pf','proj'],['doc-pf','proj'],['cm-pf','proj'],['is-pf','proj'],['rk-pf','proj'],['co-pf','proj'],['cpm-pf','proj'],['pl-pf','proj'],['fin-pf','proj'],['pr-pf','proj'],
    ['fp-lead','team'],['ft-assign','team'],['kb-af','team'],['ms-proj','proj']].forEach(([id,type])=>{
     const s=document.getElementById(id);if(!s)return;
     const v=s.value;
@@ -135,7 +135,7 @@ async function refreshData(){
 setInterval(refreshData,30000);
 
 // ══ NAV ══
-const PT={dashboard:['لوحة التحكم','نظرة عامة'],projects:['المشاريع','إدارة المشاريع'],kanban:['Kanban Board','تتبع المهام'],gantt:['Gantt Chart','الجدول الزمني'],timeline:['Timeline','الخط الزمني'],team:['الفريق','أعضاء الفريق'],sitereport:['Site Report اليومي','تقارير الأداء'],log:['سجل النشاط','مسجل على الخادم'],settings:['الإعدادات','إعدادات النظام'],documents:['تتبع المستندات','المستندات الناقصة والمتأخرة'],portfolio:['Portfolio','إدارة المشاريع المتعددة'],commissioning:['مصفوفة الإنجاز','تدقيق تفصيلي لكل لوحة عبر مراحل الإنجاز'],issues:['Issues Log','تتبع مشاكل الموقع والتشغيل'],risks:['سجل المخاطر','مخاطر محتملة — احتمالية × تأثير'],changeorders:['إدارة التغييرات','طلبات تغيير النطاق/التكلفة/الجدول الزمني'],cpm:['الجدولة الزمنية (CPM)','المسار الحرج بناءً على علاقات المهام'],punchlist:['Punch List','ملاحظات مرحلة التسليم']};
+const PT={dashboard:['لوحة التحكم','نظرة عامة'],projects:['المشاريع','إدارة المشاريع'],kanban:['Kanban Board','تتبع المهام'],gantt:['Gantt Chart','الجدول الزمني'],timeline:['Timeline','الخط الزمني'],team:['الفريق','أعضاء الفريق'],sitereport:['Site Report اليومي','تقارير الأداء'],log:['سجل النشاط','مسجل على الخادم'],settings:['الإعدادات','إعدادات النظام'],documents:['تتبع المستندات','المستندات الناقصة والمتأخرة'],portfolio:['Portfolio','إدارة المشاريع المتعددة'],commissioning:['مصفوفة الإنجاز','تدقيق تفصيلي لكل لوحة عبر مراحل الإنجاز'],issues:['Issues Log','تتبع مشاكل الموقع والتشغيل'],risks:['سجل المخاطر','مخاطر محتملة — احتمالية × تأثير'],changeorders:['إدارة التغييرات','طلبات تغيير النطاق/التكلفة/الجدول الزمني'],cpm:['الجدولة الزمنية (CPM)','المسار الحرج بناءً على علاقات المهام'],punchlist:['Punch List','ملاحظات مرحلة التسليم'],finance:['المالية','فواتير العملاء والموردين'],procurement:['المشتريات','أوامر الشراء وقاعدة بيانات الموردين']};
 async function goto(pg){
   if(pg==='team'&&!can('view_team')){toast('ليس لديك صلاحية','err');return;}
   if(pg==='settings'&&!can('settings')){toast('ليس لديك صلاحية','err');return;}
@@ -163,6 +163,8 @@ async function goto(pg){
   else if(pg==='changeorders')renderChangeOrders();
   else if(pg==='cpm')renderCPM();
   else if(pg==='punchlist')renderPunchList();
+  else if(pg==='finance')renderFinance();
+  else if(pg==='procurement')renderProcurement();
 }
 function toggleSB(){sbMini=!sbMini;document.getElementById('sb').classList.toggle('mini',sbMini);document.getElementById('sb-ic').className=sbMini?'ti ti-layout-sidebar-left-expand':'ti ti-layout-sidebar-right-collapse';}
 
@@ -692,6 +694,23 @@ async function applyDocTemplate(){
     toast(`تم إضافة ${r.added} مستند`,'ok');renderDocuments();
   }catch(e){toast(e.message,'err');}
 }
+async function exportDocsPDF(){
+  const proj=document.getElementById('doc-pf')?.value;
+  if(!proj){toast('اختاري مشروع أولاً','err');return;}
+  try{
+    const res=await fetch(API.base+'/documents/'+proj+'/export-pdf',{headers:API.headers()});
+    if(!res.ok){const e=await res.json().catch(()=>({error:'فشل التصدير'}));throw new Error(e.error);}
+    const blob=await res.blob();
+    const cd=res.headers.get('Content-Disposition')||'';
+    const match=cd.match(/filename="(.+)"/);
+    const url=URL.createObjectURL(blob);
+    const a=document.createElement('a');
+    a.href=url;a.download=match?match[1]:(proj+'-document-register.pdf');
+    document.body.appendChild(a);a.click();a.remove();
+    URL.revokeObjectURL(url);
+  }catch(e){toast(e.message||'فشل تصدير المستندات','err');}
+}
+
 async function runDocCheck(){
   try{
     const r=await API.post('/documents/check/run');
@@ -954,6 +973,232 @@ async function downloadReport(format){
     document.body.appendChild(a);a.click();a.remove();
     URL.revokeObjectURL(dlUrl);
   }catch(e){alert(e.message||'فشل تحميل التقرير');}
+}
+
+// ══ PROCUREMENT ══
+const PO_STATUS={draft:{l:'مسودة',c:'#5c657e'},sent:{l:'مُرسل',c:'#4f8ef7'},confirmed:{l:'مؤكّد',c:'#9b72f4'},delivered:{l:'تم التسليم',c:'#22c87a'},cancelled:{l:'ملغى',c:'#f05a5a'}};
+
+function switchPr(sec,el){
+  document.querySelectorAll('.pr-tab').forEach(t=>t.classList.remove('active'));
+  document.querySelectorAll('.prsec').forEach(s=>s.style.display='none');
+  el.classList.add('active');document.getElementById('pr-'+sec).style.display='block';
+  if(sec==='vendors')loadVendors();
+}
+
+async function renderProcurement(){
+  initSels();
+  const proj=document.getElementById('pr-pf')?.value;
+  const el=document.getElementById('pr-orders-content');
+  if(!proj){el.innerHTML='<div class="empty">اختر مشروع من القائمة</div>';return;}
+  el.innerHTML='<div class="loading"><i class="ti ti-loader-2"></i></div>';
+  try{
+    const items=await API.get('/procurement/'+proj+'/orders');
+    window._poCache=items;
+    const longLead=items.filter(o=>o.is_long_lead&&o.status!=='delivered'&&o.status!=='cancelled').length;
+    document.getElementById('pr-orders-content').insertAdjacentHTML('beforebegin', longLead?`<div class="pill" style="background:#f0a03018;color:#f0a030;margin-bottom:10px;display:inline-block">⚠ ${longLead} عنصر طويل التسليم لسه مستني</div>`:'');
+    el.innerHTML=items.length?(`<table class="stbl"><tr><th>رقم الأمر</th><th>المورد</th><th>الوصف</th><th>القيمة</th><th>التسليم المتوقع</th><th>الحالة</th><th></th></tr>
+      ${items.map(o=>`<tr style="${o.is_long_lead&&o.status!=='delivered'?'background:#f0a0300d':''}">
+        <td style="font-family:monospace;font-size:11px">${o.po_number}${o.is_long_lead?' ⚠':''}</td>
+        <td>${o.vendor_name||'-'}</td>
+        <td style="max-width:200px;white-space:normal">${o.description}</td>
+        <td>${fmtSAR(o.amount)}</td>
+        <td>${o.expected_delivery_date||'-'}</td>
+        <td><select class="fsel" style="font-size:11px;color:${PO_STATUS[o.status].c}" onchange="updatePOStatus(${o.id},this.value)">
+          ${Object.entries(PO_STATUS).map(([k,v])=>`<option value="${k}" ${o.status===k?'selected':''}>${v.l}</option>`).join('')}
+        </select></td>
+        <td><button class="tbtn" onclick="downloadPOPDF(${o.id})"><i class="ti ti-file-type-pdf"></i></button>
+        <button class="tbtn" onclick="deletePO(${o.id})"><i class="ti ti-trash"></i></button></td>
+      </tr>`).join('')}</table>`)
+      :'<div class="empty">لا توجد أوامر شراء لهذا المشروع بعد</div>';
+  }catch(e){el.innerHTML='<div class="empty">فشل تحميل البيانات</div>';}
+}
+async function updatePOStatus(id,status){
+  try{await API.put('/procurement/orders/'+id,{status});toast('تم التحديث','ok');renderProcurement();}catch(e){toast(e.message,'err');}
+}
+async function deletePO(id){
+  if(!confirm('حذف أمر الشراء؟'))return;
+  try{await API.del('/procurement/orders/'+id);renderProcurement();}catch(e){toast(e.message,'err');}
+}
+async function downloadPOPDF(id){
+  try{
+    const res=await fetch(API.base+'/procurement/orders/'+id+'/pdf',{headers:API.headers()});
+    if(!res.ok){const e=await res.json().catch(()=>({error:'فشل التصدير'}));throw new Error(e.error);}
+    const blob=await res.blob();
+    const url=URL.createObjectURL(blob);
+    const a=document.createElement('a');
+    a.href=url;a.download='po-'+id+'.pdf';
+    document.body.appendChild(a);a.click();a.remove();
+    URL.revokeObjectURL(url);
+  }catch(e){toast(e.message,'err');}
+}
+async function addPurchaseOrder(){
+  const proj=document.getElementById('pr-pf')?.value;
+  if(!proj){toast('اختر مشروع أولاً','err');return;}
+  try{
+    const vendors=await API.get('/procurement/vendors');
+    let vendor_id=null;
+    if(vendors.length){
+      const names=vendors.map((v,i)=>`${i+1}) ${v.name} [ID:${v.id}]`).join('\n');
+      const vid=prompt('ID المورد (سيبيه فاضي لو مش عايزة تحددي):\n'+names);
+      if(vid)vendor_id=+vid;
+    }
+    const description=prompt('وصف الطلب:');if(!description)return;
+    const amount=prompt('القيمة (SAR):');if(!amount)return;
+    const is_long_lead=confirm('هل ده عنصر طويل التسليم (Long-Lead Item)؟');
+    const expected_delivery_date=prompt('تاريخ التسليم المتوقع (YYYY-MM-DD، اختياري):','');
+    await API.post('/procurement/'+proj+'/orders',{vendor_id,description,amount:+amount,is_long_lead,expected_delivery_date:expected_delivery_date||null});
+    renderProcurement();
+  }catch(e){toast(e.message,'err');}
+}
+
+async function loadVendors(){
+  const el=document.getElementById('pr-vendors-content');
+  el.innerHTML='<div class="loading"><i class="ti ti-loader-2"></i></div>';
+  try{
+    const items=await API.get('/procurement/vendors');
+    el.innerHTML=items.length?(`<table class="stbl"><tr><th>الاسم</th><th>الفئة</th><th>جهة الاتصال</th><th>الهاتف</th><th>التقييم</th><th></th></tr>
+      ${items.map(v=>`<tr><td><strong>${v.name}</strong></td><td>${BILL_CAT[v.category]||v.category}</td><td>${v.contact_person||'-'}</td><td>${v.phone||'-'}</td><td>${v.rating?'⭐'.repeat(v.rating):'-'}</td>
+        <td><button class="tbtn" onclick="deleteVendor(${v.id})"><i class="ti ti-trash"></i></button></td></tr>`).join('')}</table>`)
+      :'<div class="empty">لا يوجد موردين مسجلين بعد</div>';
+  }catch(e){el.innerHTML='<div class="empty">فشل تحميل البيانات</div>';}
+}
+async function addVendor(){
+  const name=prompt('اسم المورد:');if(!name)return;
+  const category=prompt('الفئة: materials / labor / subcontractor / equipment / other','materials');
+  const contact_person=prompt('جهة الاتصال (اختياري):','');
+  const phone=prompt('رقم الهاتف (اختياري):','');
+  const email=prompt('الإيميل (اختياري):','');
+  try{await API.post('/procurement/vendors',{name,category:(category||'materials').trim(),contact_person,phone,email});loadVendors();}
+  catch(e){toast(e.message,'err');}
+}
+async function deleteVendor(id){
+  if(!confirm('حذف هذا المورد؟'))return;
+  try{await API.del('/procurement/vendors/'+id);loadVendors();}catch(e){toast(e.message,'err');}
+}
+
+// ══ FINANCE (AR/AP) ══
+const INV_STATUS={draft:{l:'مسودة',c:'#5c657e'},sent:{l:'مُرسلة',c:'#4f8ef7'},paid:{l:'مدفوعة',c:'#22c87a'},overdue:{l:'متأخرة',c:'#f05a5a'},cancelled:{l:'ملغاة',c:'#5c657e'}};
+const BILL_STATUS={pending:{l:'معلّقة',c:'#f0a030'},approved:{l:'معتمدة',c:'#4f8ef7'},paid:{l:'مدفوعة',c:'#22c87a'},overdue:{l:'متأخرة',c:'#f05a5a'}};
+const BILL_CAT={materials:'مواد',labor:'عمالة',subcontractor:'مقاول باطن',equipment:'معدات',other:'أخرى'};
+
+function switchFin(sec,el){
+  document.querySelectorAll('.fin-tab').forEach(t=>t.classList.remove('active'));
+  document.querySelectorAll('.finsec').forEach(s=>s.style.display='none');
+  el.classList.add('active');document.getElementById('fin-'+sec).style.display='block';
+}
+
+async function renderFinance(){
+  initSels();
+  const proj=document.getElementById('fin-pf')?.value;
+  const summaryEl=document.getElementById('fin-summary');
+  if(!proj){
+    document.getElementById('fin-ar-content').innerHTML='<div class="empty">اختر مشروع من القائمة</div>';
+    document.getElementById('fin-ap-content').innerHTML='<div class="empty">اختر مشروع من القائمة</div>';
+    summaryEl.innerHTML='';return;
+  }
+  try{
+    const s=await API.get('/finance/'+proj+'/summary');
+    summaryEl.innerHTML=`
+      <div class="kgrid">
+        <div class="kcard"><div class="kval">${fmtSAR(s.totalInvoiced)}</div><div class="klbl">إجمالي الفواتير الصادرة</div></div>
+        <div class="kcard"><div class="kval" style="color:#22c87a">${fmtSAR(s.totalPaid)}</div><div class="klbl">المُحصّل</div></div>
+        <div class="kcard"><div class="kval" style="color:${s.outstandingAR>0?'#f0a030':'#22c87a'}">${fmtSAR(s.outstandingAR)}</div><div class="klbl">مستحق من العملاء (AR)</div></div>
+        <div class="kcard"><div class="kval">${fmtSAR(s.totalBills)}</div><div class="klbl">إجمالي فواتير الموردين</div></div>
+        <div class="kcard"><div class="kval" style="color:${s.outstandingAP>0?'#f0a030':'#22c87a'}">${fmtSAR(s.outstandingAP)}</div><div class="klbl">مستحق للموردين (AP)</div></div>
+      </div>`;
+  }catch(e){summaryEl.innerHTML='';}
+  loadInvoices(proj);loadBills(proj);
+}
+
+async function loadInvoices(proj){
+  const el=document.getElementById('fin-ar-content');
+  el.innerHTML='<div class="loading"><i class="ti ti-loader-2"></i></div>';
+  try{
+    const items=await API.get('/finance/'+proj+'/invoices');
+    window._invCache=items;
+    el.innerHTML=items.length?(`<table class="stbl"><tr><th>رقم الفاتورة</th><th>العميل</th><th>الإجمالي</th><th>تاريخ الإصدار</th><th>الاستحقاق</th><th>الحالة</th><th></th></tr>
+      ${items.map(i=>`<tr>
+        <td style="font-family:monospace;font-size:11px">${i.invoice_number}</td>
+        <td>${i.client_name||'-'}</td>
+        <td>${fmtSAR(i.total)}</td>
+        <td>${i.issue_date||'-'}</td>
+        <td>${i.due_date||'-'}</td>
+        <td><select class="fsel" style="font-size:11px;color:${INV_STATUS[i.status].c}" onchange="updateInvoiceStatus(${i.id},this.value)">
+          ${Object.entries(INV_STATUS).map(([k,v])=>`<option value="${k}" ${i.status===k?'selected':''}>${v.l}</option>`).join('')}
+        </select></td>
+        <td><button class="tbtn" onclick="downloadInvoicePDF(${i.id})"><i class="ti ti-file-type-pdf"></i></button>
+        <button class="tbtn" onclick="deleteInvoice(${i.id})"><i class="ti ti-trash"></i></button></td>
+      </tr>`).join('')}</table>`)
+      :'<div class="empty">لا توجد فواتير عملاء لهذا المشروع بعد</div>';
+  }catch(e){el.innerHTML='<div class="empty">فشل تحميل البيانات</div>';}
+}
+async function updateInvoiceStatus(id,status){
+  try{await API.put('/finance/invoices/'+id,{status});toast('تم التحديث','ok');renderFinance();}catch(e){toast(e.message,'err');}
+}
+async function deleteInvoice(id){
+  if(!confirm('حذف هذه الفاتورة؟'))return;
+  try{await API.del('/finance/invoices/'+id);renderFinance();}catch(e){toast(e.message,'err');}
+}
+async function downloadInvoicePDF(id){
+  try{
+    const res=await fetch(API.base+'/finance/invoices/'+id+'/pdf',{headers:API.headers()});
+    if(!res.ok){const e=await res.json().catch(()=>({error:'فشل التصدير'}));throw new Error(e.error);}
+    const blob=await res.blob();
+    const url=URL.createObjectURL(blob);
+    const a=document.createElement('a');
+    a.href=url;a.download='invoice-'+id+'.pdf';
+    document.body.appendChild(a);a.click();a.remove();
+    URL.revokeObjectURL(url);
+  }catch(e){toast(e.message,'err');}
+}
+async function addInvoice(){
+  const proj=document.getElementById('fin-pf')?.value;
+  if(!proj){toast('اختر مشروع أولاً','err');return;}
+  const client_name=prompt('اسم العميل:');if(!client_name)return;
+  const description=prompt('وصف الخدمة/العمل (اختياري):','');
+  const amount=prompt('القيمة قبل الضريبة (SAR):');if(!amount)return;
+  const due_date=prompt('تاريخ الاستحقاق (YYYY-MM-DD، اختياري):','');
+  try{await API.post('/finance/'+proj+'/invoices',{client_name,description,amount:+amount,due_date:due_date||null});renderFinance();}
+  catch(e){toast(e.message,'err');}
+}
+
+async function loadBills(proj){
+  const el=document.getElementById('fin-ap-content');
+  el.innerHTML='<div class="loading"><i class="ti ti-loader-2"></i></div>';
+  try{
+    const items=await API.get('/finance/'+proj+'/bills');
+    el.innerHTML=items.length?(`<table class="stbl"><tr><th>رقم</th><th>المورد</th><th>الفئة</th><th>القيمة</th><th>تاريخ الاستحقاق</th><th>الحالة</th><th></th></tr>
+      ${items.map(b=>`<tr>
+        <td style="font-family:monospace;font-size:11px">${b.bill_number}</td>
+        <td>${b.vendor_name}</td>
+        <td>${BILL_CAT[b.category]||b.category}</td>
+        <td>${fmtSAR(b.amount)}</td>
+        <td>${b.due_date||'-'}</td>
+        <td><select class="fsel" style="font-size:11px;color:${BILL_STATUS[b.status].c}" onchange="updateBillStatus(${b.id},this.value)">
+          ${Object.entries(BILL_STATUS).map(([k,v])=>`<option value="${k}" ${b.status===k?'selected':''}>${v.l}</option>`).join('')}
+        </select></td>
+        <td><button class="tbtn" onclick="deleteBill(${b.id})"><i class="ti ti-trash"></i></button></td>
+      </tr>`).join('')}</table>`)
+      :'<div class="empty">لا توجد فواتير موردين لهذا المشروع بعد</div>';
+  }catch(e){el.innerHTML='<div class="empty">فشل تحميل البيانات</div>';}
+}
+async function updateBillStatus(id,status){
+  try{await API.put('/finance/bills/'+id,{status});toast('تم التحديث','ok');renderFinance();}catch(e){toast(e.message,'err');}
+}
+async function deleteBill(id){
+  if(!confirm('حذف هذه الفاتورة؟'))return;
+  try{await API.del('/finance/bills/'+id);renderFinance();}catch(e){toast(e.message,'err');}
+}
+async function addBill(){
+  const proj=document.getElementById('fin-pf')?.value;
+  if(!proj){toast('اختر مشروع أولاً','err');return;}
+  const vendor_name=prompt('اسم المورد:');if(!vendor_name)return;
+  const category=prompt('الفئة: materials / labor / subcontractor / equipment / other','materials');
+  const description=prompt('الوصف (اختياري):','');
+  const amount=prompt('القيمة (SAR):');if(!amount)return;
+  const due_date=prompt('تاريخ الاستحقاق (YYYY-MM-DD، اختياري):','');
+  try{await API.post('/finance/'+proj+'/bills',{vendor_name,category:(category||'materials').trim(),description,amount:+amount,due_date:due_date||null});renderFinance();}
+  catch(e){toast(e.message,'err');}
 }
 
 // ══ RISK REGISTER ══

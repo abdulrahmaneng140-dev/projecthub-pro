@@ -369,11 +369,106 @@ async function initDB() {
         signed_at TIMESTAMPTZ DEFAULT NOW()
       );
 
+      -- DOCUMENT REGISTER EXPORTS — tracks revision numbers for the
+      -- "export project documents as PDF" button, so each export
+      -- carries an incrementing REV number and a date, like a formal
+      -- document control register.
+      CREATE TABLE IF NOT EXISTS document_register_exports (
+        id SERIAL PRIMARY KEY,
+        project_id VARCHAR(20) REFERENCES projects(id) ON DELETE CASCADE,
+        rev INTEGER NOT NULL,
+        exported_by INTEGER REFERENCES users(id),
+        exported_at TIMESTAMPTZ DEFAULT NOW()
+      );
+
+      -- INVOICES (Accounts Receivable) — client invoices per project
+      CREATE TABLE IF NOT EXISTS invoices (
+        id SERIAL PRIMARY KEY,
+        project_id VARCHAR(20) REFERENCES projects(id) ON DELETE CASCADE,
+        invoice_number VARCHAR(50),
+        client_name VARCHAR(200),
+        description TEXT,
+        amount NUMERIC NOT NULL DEFAULT 0,
+        tax_pct NUMERIC DEFAULT 15,
+        issue_date DATE DEFAULT CURRENT_DATE,
+        due_date DATE,
+        status VARCHAR(20) DEFAULT 'draft'
+          CHECK (status IN ('draft','sent','paid','overdue','cancelled')),
+        paid_date DATE,
+        paid_amount NUMERIC,
+        notes TEXT,
+        created_by INTEGER REFERENCES users(id),
+        created_at TIMESTAMPTZ DEFAULT NOW(),
+        updated_at TIMESTAMPTZ DEFAULT NOW()
+      );
+
+      -- VENDOR BILLS (Accounts Payable) — supplier/subcontractor bills per project
+      CREATE TABLE IF NOT EXISTS vendor_bills (
+        id SERIAL PRIMARY KEY,
+        project_id VARCHAR(20) REFERENCES projects(id) ON DELETE CASCADE,
+        bill_number VARCHAR(50),
+        vendor_name VARCHAR(200) NOT NULL,
+        category VARCHAR(30) DEFAULT 'materials'
+          CHECK (category IN ('materials','labor','subcontractor','equipment','other')),
+        description TEXT,
+        amount NUMERIC NOT NULL DEFAULT 0,
+        bill_date DATE DEFAULT CURRENT_DATE,
+        due_date DATE,
+        status VARCHAR(20) DEFAULT 'pending'
+          CHECK (status IN ('pending','approved','paid','overdue')),
+        paid_date DATE,
+        notes TEXT,
+        created_by INTEGER REFERENCES users(id),
+        created_at TIMESTAMPTZ DEFAULT NOW(),
+        updated_at TIMESTAMPTZ DEFAULT NOW()
+      );
+
+      -- VENDORS — supplier/subcontractor database
+      CREATE TABLE IF NOT EXISTS vendors (
+        id SERIAL PRIMARY KEY,
+        name VARCHAR(200) NOT NULL,
+        category VARCHAR(30) DEFAULT 'materials'
+          CHECK (category IN ('materials','labor','subcontractor','equipment','other')),
+        contact_person VARCHAR(150),
+        phone VARCHAR(50),
+        email VARCHAR(200),
+        rating INTEGER CHECK (rating BETWEEN 1 AND 5),
+        notes TEXT,
+        created_by INTEGER REFERENCES users(id),
+        created_at TIMESTAMPTZ DEFAULT NOW(),
+        updated_at TIMESTAMPTZ DEFAULT NOW()
+      );
+
+      -- PURCHASE ORDERS — formal POs to vendors, per project
+      CREATE TABLE IF NOT EXISTS purchase_orders (
+        id SERIAL PRIMARY KEY,
+        project_id VARCHAR(20) REFERENCES projects(id) ON DELETE CASCADE,
+        vendor_id INTEGER REFERENCES vendors(id),
+        po_number VARCHAR(50),
+        description TEXT NOT NULL,
+        amount NUMERIC NOT NULL DEFAULT 0,
+        is_long_lead BOOLEAN DEFAULT false,
+        order_date DATE DEFAULT CURRENT_DATE,
+        expected_delivery_date DATE,
+        actual_delivery_date DATE,
+        status VARCHAR(20) DEFAULT 'draft'
+          CHECK (status IN ('draft','sent','confirmed','delivered','cancelled')),
+        notes TEXT,
+        created_by INTEGER REFERENCES users(id),
+        created_at TIMESTAMPTZ DEFAULT NOW(),
+        updated_at TIMESTAMPTZ DEFAULT NOW()
+      );
+
       -- INDEXES
       CREATE INDEX IF NOT EXISTS idx_risks_project ON risk_register(project_id);
       CREATE INDEX IF NOT EXISTS idx_co_project ON change_orders(project_id);
       CREATE INDEX IF NOT EXISTS idx_punchlist_project ON punch_list_items(project_id);
       CREATE INDEX IF NOT EXISTS idx_signatures_document ON document_signatures(document_id);
+      CREATE INDEX IF NOT EXISTS idx_docregexports_project ON document_register_exports(project_id);
+      CREATE INDEX IF NOT EXISTS idx_invoices_project ON invoices(project_id);
+      CREATE INDEX IF NOT EXISTS idx_bills_project ON vendor_bills(project_id);
+      CREATE INDEX IF NOT EXISTS idx_po_project ON purchase_orders(project_id);
+      CREATE INDEX IF NOT EXISTS idx_po_vendor ON purchase_orders(vendor_id);
       CREATE INDEX IF NOT EXISTS idx_issues_project ON project_issues(project_id);
       CREATE INDEX IF NOT EXISTS idx_commissioning_project ON commissioning_items(project_id);
       CREATE INDEX IF NOT EXISTS idx_documents_project ON project_documents(project_id);

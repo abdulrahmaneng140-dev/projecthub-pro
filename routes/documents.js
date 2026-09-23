@@ -306,4 +306,78 @@ router.post('/item/:id/sign', authMiddleware, async (req, res) => {
   } catch (e) { res.status(500).json({ error: e.message }); }
 });
 
+// ══════════════════════════════════════════════════════════════
+// DOCUMENT REGISTER PDF EXPORT — exports every document for a project
+// as a formal, dated register. Each export bumps the REV number
+// (REV 0, REV 1, REV 2...) and is logged for traceability.
+// ══════════════════════════════════════════════════════════════
+const PDFDocument = require('pdfkit');
+
+const DOC_STATUS_LABEL = { missing: 'Missing', uploaded: 'Uploaded', under_review: 'Under Review', approved: 'Approved' };
+
+router.get('/:project/export-pdf', authMiddleware, async (req, res) => {
+  try {
+    const projR = await pool.query('SELECT * FROM projects WHERE id=$1', [req.params.project]);
+    if (!projR.rows.length) return res.status(404).json({ error: 'المشروع غير موجود' });
+    const project = projR.rows[0];
+
+    const { rows: docs } = await pool.query(
+      'SELECT * FROM project_documents WHERE project_id=$1 ORDER BY category, name', [req.params.project]
+    );
+
+    const { rows: revRow } = await pool.query(
+      'SELECT COALESCE(MAX(rev), -1) + 1 AS next_rev FROM document_register_exports WHERE project_id=$1', [req.params.project]
+    );
+    const rev = revRow[0].next_rev;
+    await pool.query(
+      'INSERT INTO document_register_exports (project_id, rev, exported_by) VALUES ($1,$2,$3)',
+      [req.params.project, rev, req.user.id]
+    );
+
+    const doc = new PDFDocument({ margin: 40, size: 'A4' });
+    res.setHeader('Content-Type', 'application/pdf');
+    res.setHeader('Content-Disposition', `attachment; filename="${project.id}-document-register-REV${rev}.pdf"`);
+    doc.pipe(res);
+
+    const exportDate = new Date().toLocaleDateString('en-GB');
+    doc.fontSize(18).fillColor('#111').text('Atech Automation Technology', { align: 'right' });
+    doc.fontSize(10).fillColor('#666').text('Document Register — ' + project.name, { align: 'right' });
+    doc.fontSize(9).fillColor('#999').text(`Export Date: ${exportDate}   |   REV ${rev}`, { align: 'right' });
+    doc.moveDown(1);
+    doc.strokeColor('#333').lineWidth(1.5).moveTo(40, doc.y).lineTo(555, doc.y).stroke();
+    doc.moveDown(1);
+
+    if (!docs.length) {
+      doc.fontSize(11).fillColor('#666').text('No documents recorded for this project.');
+    } else {
+      const headers = ['Document', 'Category', 'Status', 'Due Date', 'Notes'];
+      const widths = [140, 90, 80, 75, 130];
+      let y = doc.y;
+      doc.fontSize(9).fillColor('#fff').rect(40, y, widths.reduce((a, b) => a + b, 0), 20).fill('#333');
+      let x = 40;
+      headers.forEach((h, i) => { doc.fillColor('#fff').text(h, x + 4, y + 6, { width: widths[i] - 8 }); x += widths[i]; });
+      y += 20;
+
+      docs.forEach((d, i) => {
+        if (y > 760) { doc.addPage(); y = 40; }
+        if (i % 2 === 0) doc.rect(40, y, widths.reduce((a, b) => a + b, 0), 18).fill('#f5f5f5');
+        x = 40;
+        const row = [d.name, d.category, DOC_STATUS_LABEL[d.status] || d.status, d.due_date || '-', d.notes || '-'];
+        doc.fontSize(8).fillColor('#222');
+        row.forEach((val, ci) => { doc.text(String(val), x + 4, y + 4, { width: widths[ci] - 8 }); x += widths[ci]; });
+        y += 18;
+      });
+    }
+
+    doc.end();
+
+    await pool.query(
+      'INSERT INTO activity_log (type,message,icon,color,user_id,user_name) VALUES ($1,$2,$3,$4,$5,$6)',
+      ['documents', `تصدير سجل مستندات ${project.name} — REV ${rev}`, 'ti-file-export', '#4f8ef7', req.user.id, req.user.name]
+    );
+  } catch (e) {
+    if (!res.headersSent) res.status(500).json({ error: e.message });
+  }
+});
+
 module.exports = { router, runDocumentCheck, applyDocumentTemplate };

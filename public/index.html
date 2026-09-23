@@ -56,6 +56,8 @@
         </div>
         <div class="sbgrp"><div class="sbgrp-lbl">KPI والمتابعة</div>
           <div class="ni" onclick="goto('portfolio')"><i class="ti ti-layout-grid"></i><span class="nlbl">Portfolio</span></div>
+          <div class="ni" onclick="goto('finance')"><i class="ti ti-cash"></i><span class="nlbl">المالية</span></div>
+          <div class="ni" onclick="goto('procurement')"><i class="ti ti-truck-delivery"></i><span class="nlbl">المشتريات</span></div>
           <div class="ni" onclick="goto('kpi-overview')"><i class="ti ti-chart-arrows-vertical"></i><span class="nlbl">KPI Center</span></div>
           <div class="ni" onclick="goto('kpi-alerts')"><i class="ti ti-bell-ringing"></i><span class="nlbl">التنبيهات والإيميل</span></div>
           <div class="ni" onclick="goto('documents')"><i class="ti ti-file-check"></i><span class="nlbl">المستندات</span></div>
@@ -137,8 +139,43 @@
         <div id="pf-dep" class="pfsec" style="display:none"></div>
         <div id="pf-tmpl" class="pfsec" style="display:none"></div>
       </div>
+      <div class="page" id="page-finance">
+        <div class="phd"><div class="phd-l"><div class="phd-t">المالية</div><div class="phd-s">فواتير العملاء (AR) وفواتير الموردين (AP)</div></div><div class="hacts">
+          <select class="fsel" id="fin-pf" onchange="renderFinance()"><option value="">اختر مشروع</option></select>
+        </div></div>
+        <div class="ptabs" style="display:flex;gap:8px;margin-bottom:14px">
+          <button class="tbtn fin-tab active" onclick="switchFin('ar',this)">فواتير العملاء (AR)</button>
+          <button class="tbtn fin-tab" onclick="switchFin('ap',this)">فواتير الموردين (AP)</button>
+        </div>
+        <div id="fin-summary" style="margin-bottom:14px"></div>
+        <div id="fin-ar" class="finsec">
+          <div style="margin-bottom:12px"><button class="tbtn pri" onclick="addInvoice()"><i class="ti ti-plus"></i>فاتورة عميل جديدة</button></div>
+          <div id="fin-ar-content"><div class="empty">اختر مشروع من القائمة</div></div>
+        </div>
+        <div id="fin-ap" class="finsec" style="display:none">
+          <div style="margin-bottom:12px"><button class="tbtn pri" onclick="addBill()"><i class="ti ti-plus"></i>فاتورة مورد جديدة</button></div>
+          <div id="fin-ap-content"><div class="empty">اختر مشروع من القائمة</div></div>
+        </div>
+      </div>
+      <div class="page" id="page-procurement">
+        <div class="phd"><div class="phd-l"><div class="phd-t">المشتريات</div><div class="phd-s">أوامر الشراء وقاعدة بيانات الموردين</div></div><div class="hacts">
+          <select class="fsel" id="pr-pf" onchange="renderProcurement()"><option value="">اختر مشروع</option></select>
+        </div></div>
+        <div class="ptabs" style="display:flex;gap:8px;margin-bottom:14px">
+          <button class="tbtn pr-tab active" onclick="switchPr('orders',this)">أوامر الشراء</button>
+          <button class="tbtn pr-tab" onclick="switchPr('vendors',this)">قاعدة الموردين</button>
+        </div>
+        <div id="pr-orders" class="prsec">
+          <div style="margin-bottom:12px"><button class="tbtn pri" onclick="addPurchaseOrder()"><i class="ti ti-plus"></i>أمر شراء جديد</button></div>
+          <div id="pr-orders-content"><div class="empty">اختر مشروع من القائمة</div></div>
+        </div>
+        <div id="pr-vendors" class="prsec" style="display:none">
+          <div style="margin-bottom:12px"><button class="tbtn pri" onclick="addVendor()"><i class="ti ti-plus"></i>مورد جديد</button></div>
+          <div id="pr-vendors-content"><div class="loading"><i class="ti ti-loader-2"></i></div></div>
+        </div>
+      </div>
       <div class="page" id="page-documents">
-        <div class="phd"><div class="phd-l"><div class="phd-t">تتبع المستندات</div><div class="phd-s">المستندات الناقصة والمتأخرة لكل مشروع</div></div><div class="hacts"><select class="fsel" id="doc-pf" onchange="renderDocuments()"><option value="">اختر مشروع</option></select><button class="tbtn" onclick="applyDocTemplate()"><i class="ti ti-clipboard-list"></i>تطبيق قالب</button><label class="tbtn" style="cursor:pointer"><i class="ti ti-file-import"></i>استيراد Deliverable<input type="file" accept=".xlsx,.xlsm,.xls" style="display:none" onchange="importDocsExcel(this,'deliverable')"></label><label class="tbtn" style="cursor:pointer"><i class="ti ti-file-import"></i>استيراد Pre-Requisite<input type="file" accept=".xlsx,.xlsm,.xls" style="display:none" onchange="importDocsExcel(this,'pre_requisite')"></label><button class="tbtn" onclick="addDocRequirement()"><i class="ti ti-plus"></i>مستند جديد</button><button class="tbtn pri" onclick="runDocCheck()"><i class="ti ti-bell-ringing"></i>فحص وتنبيه</button></div></div>
+        <div class="phd"><div class="phd-l"><div class="phd-t">تتبع المستندات</div><div class="phd-s">المستندات الناقصة والمتأخرة لكل مشروع</div></div><div class="hacts"><select class="fsel" id="doc-pf" onchange="renderDocuments()"><option value="">اختر مشروع</option></select><button class="tbtn" onclick="applyDocTemplate()"><i class="ti ti-clipboard-list"></i>تطبيق قالب</button><label class="tbtn" style="cursor:pointer"><i class="ti ti-file-import"></i>استيراد Deliverable<input type="file" accept=".xlsx,.xlsm,.xls" style="display:none" onchange="importDocsExcel(this,'deliverable')"></label><label class="tbtn" style="cursor:pointer"><i class="ti ti-file-import"></i>استيراد Pre-Requisite<input type="file" accept=".xlsx,.xlsm,.xls" style="display:none" onchange="importDocsExcel(this,'pre_requisite')"></label><button class="tbtn" onclick="addDocRequirement()"><i class="ti ti-plus"></i>مستند جديد</button><button class="tbtn" onclick="exportDocsPDF()"><i class="ti ti-file-type-pdf"></i>تصدير مستندات المشروع</button><button class="tbtn pri" onclick="runDocCheck()"><i class="ti ti-bell-ringing"></i>فحص وتنبيه</button></div></div>
         <div id="doc-summary" style="margin-bottom:14px"></div>
         <div id="documents-content"><div class="loading"><i class="ti ti-loader-2"></i></div></div>
       </div>

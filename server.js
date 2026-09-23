@@ -108,6 +108,12 @@ app.use('/api/punchlist', require('./routes/punchlist'));
 // Database backups — daily automatic + manual trigger
 app.use('/api/backup', require('./routes/backup'));
 
+// Finance — invoices (AR) and vendor bills (AP)
+app.use('/api/finance', require('./routes/finance'));
+
+// Procurement — vendor database and purchase orders
+app.use('/api/procurement', require('./routes/procurement'));
+
 // SPA fallback — MUST be registered after every /api/* route above,
 // otherwise it intercepts API requests and returns the HTML page instead of JSON.
 app.get('*', (req, res) => {
