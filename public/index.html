@@ -183,6 +183,7 @@
         <div class="phd"><div class="phd-l"><div class="phd-t">مصفوفة الإنجاز</div><div class="phd-s">تدقيق تفصيلي لكل لوحة/حلقة عبر مراحل الإنجاز</div></div><div class="hacts">
           <select class="fsel" id="cm-pf" onchange="renderCommissioning()"><option value="">اختر مشروع</option></select>
           <label class="tbtn" style="cursor:pointer"><i class="ti ti-file-import"></i>استيراد Excel<input type="file" accept=".xlsx,.xlsm,.xls" id="cm-import-file" style="display:none" onchange="importCommissioning(this)"></label>
+          <button class="tbtn" onclick="exportCommissioningExcel()"><i class="ti ti-file-export"></i>تصدير Excel</button>
           <button class="tbtn pri" onclick="addCommissioningItem()"><i class="ti ti-plus"></i>لوحة جديدة</button>
         </div></div>
         <div id="cm-summary" style="margin-bottom:14px"></div>

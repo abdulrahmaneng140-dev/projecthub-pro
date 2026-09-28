@@ -164,4 +164,79 @@ router.post('/:project/import', authMiddleware, requireRole('admin', 'pm', 'lead
   } catch (e) { res.status(400).json({ error: 'فشل قراءة ملف Excel: ' + e.message }); }
 });
 
+// ══════════════════════════════════════════════════════════════
+// EXCEL EXPORT — mirrors the exact original "Progress" sheet layout so
+// weekly exports look identical to the file the team already uses:
+// row 1 = category headers (merged), row 2 = stage sub-headers,
+// row 3+ = data. '●' = done, '-' = n/a, blank = pending.
+// ══════════════════════════════════════════════════════════════
+router.get('/:project/export', authMiddleware, async (req, res) => {
+  try {
+    const projR = await pool.query('SELECT * FROM projects WHERE id=$1', [req.params.project]);
+    if (!projR.rows.length) return res.status(404).json({ error: 'المشروع غير موجود' });
+    const project = projR.rows[0];
+
+    const { rows: items } = await pool.query(
+      'SELECT * FROM commissioning_items WHERE project_id=$1 ORDER BY item_no NULLS LAST, id', [req.params.project]
+    );
+
+    const wb = new ExcelJS.Workbook();
+    const ws = wb.addWorksheet('Progress');
+
+    // Column widths: No. | Panel Name | Serving Equipment | 19 stage columns
+    ws.getColumn(1).width = 6;
+    ws.getColumn(2).width = 28;
+    ws.getColumn(3).width = 24;
+    for (let c = 4; c <= 3 + STAGE_KEYS.length; c++) ws.getColumn(c).width = 5;
+
+    // Row 1 — category headers, merged across their stage columns
+    const cats = [];
+    STAGE_TEMPLATE.forEach(s => {
+      if (!cats.length || cats[cats.length - 1].name !== s.category) cats.push({ name: s.category, count: 1 });
+      else cats[cats.length - 1].count++;
+    });
+    ws.mergeCells(1, 1, 2, 1); ws.getCell(1, 1).value = 'No.';
+    ws.mergeCells(1, 2, 2, 2); ws.getCell(1, 2).value = 'Panel Name';
+    ws.mergeCells(1, 3, 2, 3); ws.getCell(1, 3).value = 'Serving Equipment/Zone';
+    let col = 4;
+    cats.forEach(c => {
+      if (c.count > 1) ws.mergeCells(1, col, 1, col + c.count - 1);
+      ws.getCell(1, col).value = c.name;
+      col += c.count;
+    });
+    ws.getRow(1).font = { bold: true };
+    ws.getRow(1).alignment = { horizontal: 'center', vertical: 'middle' };
+
+    // Row 2 — stage sub-headers
+    STAGE_TEMPLATE.forEach((s, i) => { ws.getCell(2, 4 + i).value = s.label; });
+    ws.getRow(2).font = { bold: true, size: 9 };
+    ws.getRow(2).alignment = { horizontal: 'center', vertical: 'middle', textRotation: 90 };
+
+    // Data rows
+    items.forEach((item, r) => {
+      const row = r + 3;
+      ws.getCell(row, 1).value = item.item_no || r + 1;
+      ws.getCell(row, 2).value = item.panel_name;
+      ws.getCell(row, 3).value = item.serving_equipment || '';
+      STAGE_KEYS.forEach((key, i) => {
+        const status = item.stages?.[key];
+        ws.getCell(row, 4 + i).value = status === 'done' ? '●' : status === 'na' ? '-' : '';
+        ws.getCell(row, 4 + i).alignment = { horizontal: 'center' };
+      });
+    });
+
+    res.setHeader('Content-Type', 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet');
+    res.setHeader('Content-Disposition', `attachment; filename="${project.id}-Progress-${new Date().toISOString().slice(0, 10)}.xlsx"`);
+    await wb.xlsx.write(res);
+    res.end();
+
+    pool.query(
+      'INSERT INTO activity_log (type,message,icon,color,user_id,user_name) VALUES ($1,$2,$3,$4,$5,$6)',
+      ['documents', `تصدير مصفوفة الإنجاز Excel — ${project.name}`, 'ti-file-export', '#4f8ef7', req.user.id, req.user.name]
+    ).catch(() => {});
+  } catch (e) {
+    if (!res.headersSent) res.status(500).json({ error: e.message });
+  }
+});
+
 module.exports = router;

@@ -459,6 +459,38 @@ async function initDB() {
         updated_at TIMESTAMPTZ DEFAULT NOW()
       );
 
+      -- TIMESHEETS — actual hours logged per member per project
+      CREATE TABLE IF NOT EXISTS timesheets (
+        id SERIAL PRIMARY KEY,
+        project_id VARCHAR(20) REFERENCES projects(id) ON DELETE CASCADE,
+        task_id INTEGER REFERENCES tasks(id) ON DELETE SET NULL,
+        member_name VARCHAR(100) NOT NULL,
+        work_date DATE NOT NULL DEFAULT CURRENT_DATE,
+        hours NUMERIC NOT NULL CHECK (hours > 0 AND hours <= 24),
+        description TEXT,
+        status VARCHAR(20) DEFAULT 'submitted'
+          CHECK (status IN ('submitted','approved','rejected')),
+        approved_by INTEGER REFERENCES users(id),
+        created_by INTEGER REFERENCES users(id),
+        created_at TIMESTAMPTZ DEFAULT NOW()
+      );
+
+      -- LEAVE REQUESTS — basic attendance/leave tracking
+      CREATE TABLE IF NOT EXISTS leave_requests (
+        id SERIAL PRIMARY KEY,
+        member_name VARCHAR(100) NOT NULL,
+        leave_type VARCHAR(20) DEFAULT 'annual'
+          CHECK (leave_type IN ('annual','sick','unpaid','other')),
+        start_date DATE NOT NULL,
+        end_date DATE NOT NULL,
+        reason TEXT,
+        status VARCHAR(20) DEFAULT 'pending'
+          CHECK (status IN ('pending','approved','rejected')),
+        approved_by INTEGER REFERENCES users(id),
+        created_by INTEGER REFERENCES users(id),
+        created_at TIMESTAMPTZ DEFAULT NOW()
+      );
+
       -- INDEXES
       CREATE INDEX IF NOT EXISTS idx_risks_project ON risk_register(project_id);
       CREATE INDEX IF NOT EXISTS idx_co_project ON change_orders(project_id);
@@ -469,6 +501,9 @@ async function initDB() {
       CREATE INDEX IF NOT EXISTS idx_bills_project ON vendor_bills(project_id);
       CREATE INDEX IF NOT EXISTS idx_po_project ON purchase_orders(project_id);
       CREATE INDEX IF NOT EXISTS idx_po_vendor ON purchase_orders(vendor_id);
+      CREATE INDEX IF NOT EXISTS idx_timesheets_project ON timesheets(project_id);
+      CREATE INDEX IF NOT EXISTS idx_timesheets_member ON timesheets(member_name);
+      CREATE INDEX IF NOT EXISTS idx_leave_member ON leave_requests(member_name);
       CREATE INDEX IF NOT EXISTS idx_issues_project ON project_issues(project_id);
       CREATE INDEX IF NOT EXISTS idx_commissioning_project ON commissioning_items(project_id);
       CREATE INDEX IF NOT EXISTS idx_documents_project ON project_documents(project_id);

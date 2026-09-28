@@ -847,6 +847,23 @@ async function addCommissioningItem(){
   try{await API.post('/commissioning/'+proj,{panel_name,serving_equipment});renderCommissioning();}
   catch(e){toast(e.message,'err');}
 }
+async function exportCommissioningExcel(){
+  const proj=document.getElementById('cm-pf')?.value;
+  if(!proj){toast('اختاري مشروع أولاً','err');return;}
+  try{
+    const res=await fetch(API.base+'/commissioning/'+proj+'/export',{headers:API.headers()});
+    if(!res.ok){const e=await res.json().catch(()=>({error:'فشل التصدير'}));throw new Error(e.error);}
+    const blob=await res.blob();
+    const cd=res.headers.get('Content-Disposition')||'';
+    const match=cd.match(/filename="(.+)"/);
+    const url=URL.createObjectURL(blob);
+    const a=document.createElement('a');
+    a.href=url;a.download=match?match[1]:(proj+'-progress.xlsx');
+    document.body.appendChild(a);a.click();a.remove();
+    URL.revokeObjectURL(url);
+  }catch(e){toast(e.message||'فشل تصدير المصفوفة','err');}
+}
+
 async function importCommissioning(input){
   const file=input.files[0];if(!file)return;
   const proj=document.getElementById('cm-pf')?.value;
